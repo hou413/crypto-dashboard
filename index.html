@@ -543,11 +543,10 @@
         }
     }
     
-    // ===== Chainlink BTC/USD 价格 =====
+    // ===== Target Price (Chainlink BTC/USD) =====
     async function fetchChainlinkPrice() {
-        // Chainlink BTC/USD aggregator on Ethereum mainnet
         const CHAINLINK_BTC_USD = '0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c';
-        const LATEST_ROUND_DATA = '0xfeaf968c'; // latestRoundData()
+        const LATEST_ROUND_DATA = '0xfeaf968c';
         
         const rpcUrls = [
             'https://ethereum.publicnode.com',
@@ -572,9 +571,8 @@
                 const data = await resp.json();
                 
                 if (data.result && data.result.length >= 322) {
-                    // latestRoundData() returns 5 uint256 values:
+                    // latestRoundData() returns 5 uint256:
                     // roundId (2-65), answer (66-129), startedAt (130-193), updatedAt (194-257), answeredInRound (258-321)
-                    // answer is at position 66-129 (32 bytes = 64 hex chars)
                     const answer = parseInt(data.result.substring(66, 130), 16);
                     return answer / 1e8;
                 }
@@ -586,43 +584,31 @@
         return null;
     }
     
-    // 获取或缓存轮次开始时的 Chainlink 价格（Target Price）
     async function fetchTargetPrice(eventStart, period) {
         if (!eventStart) return null;
         
-        // v2 cache key to invalidate old incorrect values
-        const cacheKey = `target_price_v2_${period}_${eventStart}`;
+        const cacheKey = `target_price_chainlink_${period}_${eventStart}`;
         
         // 先检查缓存
         try {
             const cached = localStorage.getItem(cacheKey);
-            if (cached) {
-                return parseFloat(cached);
-            }
-        } catch (e) {
-            // localStorage 不可用
-        }
+            if (cached) return parseFloat(cached);
+        } catch (e) {}
         
-        // 检查轮次是否刚开始（10分钟内）
+        // 轮次开始后 10 分钟内获取 Chainlink 价格并缓存
         const startMs = new Date(eventStart).getTime();
         const now = Date.now();
         const elapsed = now - startMs;
         
         if (elapsed >= 0 && elapsed < 10 * 60 * 1000) {
-            // 轮次刚开始或即将开始，获取 Chainlink 价格并缓存
             const price = await fetchChainlinkPrice();
             if (price) {
-                try {
-                    localStorage.setItem(cacheKey, price.toString());
-                    console.log(`[DNF] Cached target price for ${period}: $${price}`);
-                } catch (e) {
-                    // 忽略缓存错误
-                }
+                try { localStorage.setItem(cacheKey, price.toString()); } catch (e) {}
+                console.log(`[DNF] Cached Chainlink target price for ${period}: $${price}`);
                 return price;
             }
         }
         
-        // 轮次已开始超过 10 分钟且无缓存，返回 null
         return null;
     }
     
