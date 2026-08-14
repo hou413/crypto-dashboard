@@ -7,8 +7,8 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
-            background: #0f1117; 
-            color: #e5e7eb; 
+            background: #ffffff; 
+            color: #1f2937; 
             font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; 
             padding: 20px;
             min-height: 100vh;
@@ -21,18 +21,18 @@
             align-items: center; 
             margin-bottom: 24px; 
             padding: 16px 20px;
-            background: linear-gradient(135deg, #1a1d29, #252836);
+            background: #ffffff;
             border-radius: 16px;
-            border: 1px solid #2d3148;
+            border-bottom: 2px solid #e5e7eb;
         }
-        .header h1 { font-size: 28px; font-weight: 700; }
+        .header h1 { font-size: 28px; font-weight: 700; color: #4f46e5; }
         .header h1 span { 
-            background: linear-gradient(135deg, #6366f1, #a855f7); 
+            background: linear-gradient(135deg, #6366f1, #8b5cf6); 
             -webkit-background-clip: text; 
             -webkit-text-fill-color: transparent; 
         }
         .header-right { text-align: right; }
-        .price { font-size: 32px; font-weight: 700; color: #60a5fa; }
+        .price { font-size: 32px; font-weight: 700; color: #2563eb; }
         .time { font-size: 14px; color: #6b7280; margin-top: 4px; }
         
         /* Grid */
@@ -45,10 +45,11 @@
         
         /* Period Card */
         .period-card { 
-            background: #1a1d29;
-            border: 1px solid #2d3148;
-            border-radius: 20px; 
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 16px; 
             padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
         .period-header { 
             display: flex; 
@@ -56,7 +57,7 @@
             align-items: center; 
             margin-bottom: 16px;
             padding-bottom: 12px;
-            border-bottom: 1px solid #2d3148;
+            border-bottom: 1px solid #f3f4f6;
         }
         .period-title { 
             font-size: 24px; 
@@ -65,20 +66,20 @@
             align-items: center; 
             gap: 10px; 
         }
-        .period-title.p4h { color: #818cf8; }
-        .period-title.p1h { color: #fbbf24; }
+        .period-title.p4h { color: #4f46e5; }
+        .period-title.p1h { color: #d97706; }
         .badge { 
             font-size: 13px; 
             padding: 4px 10px; 
             border-radius: 8px; 
             font-weight: 500;
         }
-        .badge-main { background: rgba(99,102,241,0.2); color: #818cf8; }
-        .badge-ref { background: rgba(251,191,36,0.2); color: #fbbf24; }
+        .badge-main { background: #eef2ff; color: #4f46e5; }
+        .badge-ref { background: #fef3c7; color: #d97706; }
         .round-time { 
             font-size: 15px; 
-            color: #9ca3af; 
-            background: #252836; 
+            color: #6b7280; 
+            background: #f9fafb; 
             padding: 6px 12px; 
             border-radius: 10px; 
         }
@@ -86,9 +87,9 @@
         /* Strategy Section */
         .strategy { 
             margin-bottom: 16px;
-            background: #252836;
-            border: 1px solid #2d3148;
-            border-radius: 14px; 
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px; 
             padding: 16px;
         }
         .strategy:last-child { margin-bottom: 0; }
@@ -102,8 +103,8 @@
             font-size: 16px; 
             font-weight: 600;
         }
-        .strategy-name.dnf { color: #34d399; }
-        .strategy-name.hbw { color: #a78bfa; }
+        .strategy-name.dnf { color: #059669; }
+        .strategy-name.hbw { color: #7c3aed; }
         
         /* Signal Badge */
         .signal { 
@@ -112,10 +113,10 @@
             padding: 6px 14px; 
             border-radius: 10px; 
         }
-        .signal-up { background: rgba(16,185,129,0.2); color: #34d399; }
-        .signal-down { background: rgba(239,68,68,0.2); color: #f87171; }
-        .signal-none { background: #374151; color: #6b7280; }
-        .signal-blocked { background: rgba(251,191,36,0.2); color: #fbbf24; }
+        .signal-up { background: #d1fae5; color: #059669; }
+        .signal-down { background: #fee2e2; color: #dc2626; }
+        .signal-none { background: #f3f4f6; color: #6b7280; }
+        .signal-blocked { background: #fef3c7; color: #d97706; }
         
         /* Metrics Grid */
         .metrics-grid {
@@ -124,15 +125,15 @@
             gap: 10px;
         }
         .metric-box {
-            background: #1a1d29;
-            border: 1px solid #2d3148;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
             border-radius: 10px;
             padding: 12px;
             text-align: center;
         }
         .metric-label { 
             font-size: 11px; 
-            color: #6b7280; 
+            color: #9ca3af; 
             text-transform: uppercase;
             margin-bottom: 4px;
             letter-spacing: 0.5px;
@@ -140,10 +141,10 @@
         .metric-value { 
             font-size: 18px;
             font-weight: 700; 
-            color: #f3f4f6;
+            color: #1f2937;
         }
-        .metric-value.positive { color: #34d399; }
-        .metric-value.negative { color: #f87171; }
+        .metric-value.positive { color: #059669; }
+        .metric-value.negative { color: #dc2626; }
         
         /* HBW Section */
         .target-box {
