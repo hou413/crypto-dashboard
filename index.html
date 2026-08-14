@@ -543,19 +543,83 @@
         }
     }
     
-    // 获取轮次开始时的价格（Target Price）
-    async function fetchTargetPrice(eventStart) {
-        if (!eventStart) return null;
-        try {
-            const startMs = new Date(eventStart).getTime();
-            const url = `${BINANCE_API}/api/v3/klines?symbol=BTCUSDT&interval=1m&startTime=${startMs}&limit=1`;
-            const resp = await fetch(url);
-            const data = await resp.json();
-            if (data && data.length > 0) return parseFloat(data[0][4]);
-            return null;
-        } catch {
-            return null;
+    // ===== Chainlink BTC/USD 价格 =====
+    async function fetchChainlinkPrice() {
+        // Chainlink BTC/USD aggregator on Ethereum mainnet
+        const CHAINLINK_BTC_USD = '0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c';
+        const LATEST_ROUND_DATA = '0xfeaf968c'; // latestRoundData()
+        
+        const rpcUrls = [
+            'https://ethereum.publicnode.com',
+            'https://1rpc.io/eth',
+            'https://eth.llamarpc.com'
+        ];
+        
+        const payload = {
+            jsonrpc: '2.0',
+            method: 'eth_call',
+            params: [{ to: CHAINLINK_BTC_USD, data: LATEST_ROUND_DATA }, 'latest'],
+            id: 1
+        };
+        
+        for (const rpcUrl of rpcUrls) {
+            try {
+                const resp = await fetch(rpcUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await resp.json();
+                
+                if (data.result && data.result.length >= 194) {
+                    // answer (32 bytes) - price with 8 decimals
+                    const answer = parseInt(data.result.substring(130, 194), 16);
+                    return answer / 1e8;
+                }
+            } catch (e) {
+                console.error('Chainlink RPC error:', e);
+                continue;
+            }
         }
+        return null;
+    }
+    
+    // 获取或缓存轮次开始时的 Chainlink 价格（Target Price）
+    async function fetchTargetPrice(eventStart, period) {
+        if (!eventStart) return null;
+        
+        const cacheKey = `target_price_${period}_${eventStart}`;
+        
+        // 先检查缓存
+        try {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                return parseFloat(cached);
+            }
+        } catch (e) {
+            // localStorage 不可用
+        }
+        
+        // 检查轮次是否刚开始（5分钟内）
+        const startMs = new Date(eventStart).getTime();
+        const now = Date.now();
+        const elapsed = now - startMs;
+        
+        if (elapsed < 5 * 60 * 1000) {
+            // 轮次刚开始，获取 Chainlink 价格并缓存
+            const price = await fetchChainlinkPrice();
+            if (price) {
+                try {
+                    localStorage.setItem(cacheKey, price.toString());
+                } catch (e) {
+                    // 忽略缓存错误
+                }
+                return price;
+            }
+        }
+        
+        // 轮次已开始一段时间且无缓存，返回 null
+        return null;
     }
     
     // ===== 渲染 =====
