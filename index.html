@@ -404,7 +404,7 @@
             const directionText = isBullish ? '阳线' : '阴线';
 
             // Taker
-            const currentTaker = klines1h[klines1h.length - 1].takerBuyVolume / klines1h[klines1h.length - 1].volume;
+            const currentTaker = klines1m[klines1m.length - 1].takerBuyVolume / klines1m[klines1m.length - 1].volume;
             const takerValEl = document.getElementById('taker-value');
             const takerStatusEl = document.getElementById('taker-status');
             const takerDir = currentTaker > 0.5 ? '买方' : '卖方';
@@ -415,7 +415,7 @@
             else { takerStatusEl.textContent = '✅ 正常'; takerStatusEl.className = 'indicator-status normal'; }
 
             // Volume
-            const currentVolume = klines1h[klines1h.length - 1].volume / avgVolume;
+            const currentVolume = klines1m[klines1m.length - 1].volume / avgVolume;
             const volumeValEl = document.getElementById('volume-value');
             const volumeStatusEl = document.getElementById('volume-status');
             const volumeDirection = isBullish ? '放量涨' : '放量跌';
