@@ -242,6 +242,75 @@
             color: #92400e;
             text-align: center;
         }
+        
+        /* Momentum Monitor Section */
+        .momentum-section {
+            margin-top: 24px;
+            padding: 20px;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .momentum-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .momentum-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #059669;
+        }
+        .momentum-subtitle {
+            font-size: 14px;
+            color: #6b7280;
+        }
+        .momentum-charts {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+        @media (max-width: 900px) { .momentum-charts { grid-template-columns: 1fr; } }
+        .chart-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .chart-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 12px;
+        }
+        .chart-container {
+            position: relative;
+            height: 120px;
+            width: 100%;
+        }
+        .chart-canvas {
+            width: 100%;
+            height: 100%;
+        }
+        .chart-legend {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 11px;
+            color: #6b7280;
+        }
+        .chart-value {
+            font-size: 18px;
+            font-weight: 700;
+            margin-top: 8px;
+        }
+        .chart-value.positive { color: #059669; }
+        .chart-value.negative { color: #dc2626; }
+        .chart-value.warning { color: #d97706; }
     </style>
 </head>
 <body>
@@ -259,6 +328,48 @@
     
     <div id="content" class="grid">
         <div class="loading">加载数据...</div>
+    </div>
+    
+    <div class="momentum-section">
+        <div class="momentum-header">
+            <div class="momentum-title">📈 市场动量监控</div>
+            <div class="momentum-subtitle">4H 周期 · 反转预警指标</div>
+        </div>
+        <div class="momentum-charts">
+            <div class="chart-card">
+                <div class="chart-title">💹 Taker 买卖比</div>
+                <div class="chart-container">
+                    <canvas id="chart-taker" class="chart-canvas"></canvas>
+                </div>
+                <div class="chart-legend">
+                    <span>买方主导</span>
+                    <span id="taker-current">--</span>
+                    <span>卖方主导</span>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">📊 成交量突增</div>
+                <div class="chart-container">
+                    <canvas id="chart-volume" class="chart-canvas"></canvas>
+                </div>
+                <div class="chart-legend">
+                    <span>正常</span>
+                    <span id="volume-current">--</span>
+                    <span>异常</span>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">🕯️ K线实体大小</div>
+                <div class="chart-container">
+                    <canvas id="chart-body" class="chart-canvas"></canvas>
+                </div>
+                <div class="chart-legend">
+                    <span>小实体</span>
+                    <span id="body-current">--</span>
+                    <span>大实体</span>
+                </div>
+            </div>
+        </div>
     </div>
     
     <script>
@@ -819,6 +930,138 @@
     refresh();
     setInterval(refresh, 30000);
     setInterval(updateCountdowns, 1000);
+    
+    // ===== 市场动量监控 =====
+    async function updateMomentumMonitor() {
+        try {
+            // 获取 4H K线数据（最近 20 根）
+            const klines4h = await fetchKlines('4h', 20);
+            if (!klines4h || klines4h.length === 0) return;
+            
+            // 计算三个指标
+            const takerRatios = [];
+            const volumeRatios = [];
+            const bodySizes = [];
+            
+            // 计算平均成交量（用于突增计算）
+            const avgVolume = klines4h.reduce((sum, k) => sum + k.volume, 0) / klines4h.length;
+            
+            klines4h.forEach(k => {
+                // 1. Taker 买卖比
+                const takerRatio = k.takerBuyVolume / k.volume;
+                takerRatios.push(takerRatio);
+                
+                // 2. 成交量突增（当前成交量 / 平均成交量）
+                const volumeRatio = k.volume / avgVolume;
+                volumeRatios.push(volumeRatio);
+                
+                // 3. K线实体大小（|close - open| / open * 100）
+                const bodySize = Math.abs(k.close - k.open) / k.open * 100;
+                bodySizes.push(bodySize);
+            });
+            
+            // 绘制图表
+            drawLineChart('chart-taker', takerRatios, '#10b981', 0, 1);
+            drawLineChart('chart-volume', volumeRatios, '#f59e0b', 0, Math.max(...volumeRatios) * 1.2);
+            drawLineChart('chart-body', bodySizes, '#8b5cf6', 0, Math.max(...bodySizes) * 1.2);
+            
+            // 更新当前值显示
+            const currentTaker = takerRatios[takerRatios.length - 1];
+            document.getElementById('taker-current').textContent = `买 ${(currentTaker * 100).toFixed(1)}%`;
+            
+            const currentVolume = volumeRatios[volumeRatios.length - 1];
+            const volumeEl = document.getElementById('volume-current');
+            volumeEl.textContent = `${currentVolume.toFixed(2)}x`;
+            volumeEl.className = currentVolume > 1.5 ? 'chart-value warning' : 'chart-value';
+            
+            const currentBody = bodySizes[bodySizes.length - 1];
+            const bodyEl = document.getElementById('body-current');
+            bodyEl.textContent = `${currentBody.toFixed(2)}%`;
+            bodyEl.className = currentBody > 1.0 ? 'chart-value negative' : 'chart-value';
+            
+        } catch (e) {
+            console.error('Momentum monitor error:', e);
+        }
+    }
+    
+    function drawLineChart(canvasId, data, color, minVal, maxVal) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width = canvas.offsetWidth;
+        const height = canvas.height = canvas.offsetHeight;
+        
+        // 清空画布
+        ctx.clearRect(0, 0, width, height);
+        
+        if (data.length === 0) return;
+        
+        // 计算坐标
+        const padding = 10;
+        const chartWidth = width - padding * 2;
+        const chartHeight = height - padding * 2;
+        const range = maxVal - minVal || 1;
+        
+        const points = data.map((val, i) => ({
+            x: padding + (i / (data.length - 1)) * chartWidth,
+            y: padding + chartHeight - ((val - minVal) / range) * chartHeight
+        }));
+        
+        // 绘制背景网格
+        ctx.strokeStyle = '#e5e7eb';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+            const y = padding + (i / 4) * chartHeight;
+            ctx.beginPath();
+            ctx.moveTo(padding, y);
+            ctx.lineTo(width - padding, y);
+            ctx.stroke();
+        }
+        
+        // 绘制折线
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        points.forEach((p, i) => {
+            if (i === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+        });
+        ctx.stroke();
+        
+        // 绘制渐变填充
+        const gradient = ctx.createLinearGradient(0, padding, 0, height - padding);
+        gradient.addColorStop(0, color + '40');
+        gradient.addColorStop(1, color + '00');
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        points.forEach(p => ctx.lineTo(p.x, p.y));
+        ctx.lineTo(points[points.length - 1].x, height - padding);
+        ctx.lineTo(points[0].x, height - padding);
+        ctx.closePath();
+        ctx.fill();
+        
+        // 绘制当前值点
+        const lastPoint = points[points.length - 1];
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(lastPoint.x, lastPoint.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 白色内圈
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(lastPoint.x, lastPoint.y, 2, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    // 初始化动量监控
+    updateMomentumMonitor();
+    setInterval(updateMomentumMonitor, 30000);
     </script>
 </body>
 </html>
