@@ -1008,7 +1008,7 @@
             const currentBody = bodySizes[bodySizes.length - 1];
             
             // 获取最后一根K线判断方向
-            const lastKline = klines4h[klines4h.length - 1];
+            const lastKline = klines1h[klines1h.length - 1];
             const isBullish = lastKline.close > lastKline.open;
             const direction = isBullish ? '🟢' : '🔴';
             const directionText = isBullish ? '阳线' : '阴线';
