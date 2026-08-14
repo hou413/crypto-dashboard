@@ -571,9 +571,11 @@
                 });
                 const data = await resp.json();
                 
-                if (data.result && data.result.length >= 194) {
-                    // answer (32 bytes) - price with 8 decimals
-                    const answer = parseInt(data.result.substring(130, 194), 16);
+                if (data.result && data.result.length >= 322) {
+                    // latestRoundData() returns 5 uint256 values:
+                    // roundId (2-65), answer (66-129), startedAt (130-193), updatedAt (194-257), answeredInRound (258-321)
+                    // answer is at position 66-129 (32 bytes = 64 hex chars)
+                    const answer = parseInt(data.result.substring(66, 130), 16);
                     return answer / 1e8;
                 }
             } catch (e) {
