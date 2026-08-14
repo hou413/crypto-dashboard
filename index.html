@@ -149,6 +149,66 @@
             color: #6b7280; 
             font-size: 18px;
         }
+        
+        /* Taker Volume Section */
+        .taker-section {
+            margin-top: 12px;
+            padding: 12px;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+        }
+        .taker-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+        .taker-bar-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .taker-bar {
+            flex: 1;
+            height: 24px;
+            background: #f3f4f6;
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+        }
+        .taker-buy {
+            background: linear-gradient(90deg, #10b981, #34d399);
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .taker-sell {
+            background: linear-gradient(90deg, #f87171, #ef4444);
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .taker-warning {
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #92400e;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -193,7 +253,8 @@
             high: parseFloat(k[2]),
             low: parseFloat(k[3]),
             close: parseFloat(k[4]),
-            volume: parseFloat(k[5])
+            volume: parseFloat(k[5]),
+            takerBuyVolume: parseFloat(k[9])  // Taker buy base asset volume
         }));
     }
     
@@ -201,6 +262,32 @@
         const resp = await fetch(`${BINANCE_API}/api/v3/ticker/price?symbol=BTCUSDT`);
         const data = await resp.json();
         return parseFloat(data.price);
+    }
+    
+    // 计算 Taker Buy/Sell Ratio（近 N 根 K 线）
+    function calcTakerRatio(candles, numCandles = 2) {
+        // 取最近 numCandles 根 K 线（排除当前未完成的）
+        const recent = candles.slice(1, numCandles + 1);
+        if (recent.length === 0) return { buyRatio: 0.5, sellRatio: 0.5, buyVolume: 0, sellVolume: 0 };
+        
+        let totalBuy = 0;
+        let totalVolume = 0;
+        
+        recent.forEach(c => {
+            totalBuy += c.takerBuyVolume;
+            totalVolume += c.volume;
+        });
+        
+        const buyRatio = totalVolume > 0 ? totalBuy / totalVolume : 0.5;
+        const sellRatio = 1 - buyRatio;
+        
+        return {
+            buyRatio,
+            sellRatio,
+            buyVolume: totalBuy,
+            sellVolume: totalVolume - totalBuy,
+            totalVolume
+        };
     }
     
     // ===== 技术指标 =====
@@ -336,12 +423,23 @@
         const dynThreshold = getDynamicThreshold(period, THRESHOLDS[period], candles);
         const probability = calcProbability(deviation, timeFactor);
         
+        // 计算 Taker Buy/Sell Ratio
+        const takerRatio = calcTakerRatio(candles, 2);  // 近 10 分钟（2 根 5M K线）
+        
         let signal = deviation > 0 ? 'DOWN' : 'UP';
         let trendBlocked = false;
         let originalSignal = signal;
         
         if (signal === 'UP' && trend.regime === 'TRENDING_DOWN') trendBlocked = true;
         else if (signal === 'DOWN' && trend.regime === 'TRENDING_UP') trendBlocked = true;
+        
+        // Taker Volume 预警
+        let takerWarning = null;
+        if (signal === 'UP' && takerRatio.sellRatio > 0.60) {
+            takerWarning = { type: 'sell_pressure', ratio: takerRatio.sellRatio };
+        } else if (signal === 'DOWN' && takerRatio.buyRatio > 0.60) {
+            takerWarning = { type: 'buy_pressure', ratio: takerRatio.buyRatio };
+        }
         
         return {
             signal: trendBlocked ? null : signal,
@@ -356,7 +454,9 @@
             trend: trend.regime,
             emaSlope: calcEMASlope(candles, 20),
             dynamicThreshold: dynThreshold.threshold,
-            thresholdMultiplier: dynThreshold.multiplier
+            thresholdMultiplier: dynThreshold.multiplier,
+            takerRatio,
+            takerWarning
         };
     }
     
@@ -481,6 +581,35 @@
             `;
         }
         
+        // Taker Volume 区域
+        let takerSection = '';
+        if (dnf && dnf.takerRatio) {
+            const tr = dnf.takerRatio;
+            const buyPct = (tr.buyRatio * 100).toFixed(1);
+            const sellPct = (tr.sellRatio * 100).toFixed(1);
+            
+            let warningHtml = '';
+            if (dnf.takerWarning) {
+                const warnText = dnf.takerWarning.type === 'sell_pressure' 
+                    ? `⚠️ 卖压预警：近10分钟卖方占比 ${sellPct}%，回归可能延迟`
+                    : `⚠️ 买压预警：近10分钟买方占比 ${buyPct}%，回归可能延迟`;
+                warningHtml = `<div class="taker-warning">${warnText}</div>`;
+            }
+            
+            takerSection = `
+                <div class="taker-section">
+                    <div class="taker-title">📊 Taker 买卖量 (近10分钟)</div>
+                    <div class="taker-bar-container">
+                        <div class="taker-bar">
+                            <div class="taker-buy" style="width:${buyPct}%">买 ${buyPct}%</div>
+                            <div class="taker-sell" style="width:${sellPct}%">卖 ${sellPct}%</div>
+                        </div>
+                    </div>
+                    ${warningHtml}
+                </div>
+            `;
+        }
+        
         return `
             <div class="period-card">
                 <div class="period-header">
@@ -493,6 +622,7 @@
                         <span class="signal ${dnfClass}">${dnfSignal}</span>
                     </div>
                     ${dnfMetrics}
+                    ${takerSection}
                 </div>
             </div>
         `;
