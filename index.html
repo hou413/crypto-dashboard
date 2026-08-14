@@ -373,8 +373,11 @@
     
     function calcProbability(deviation, timeFactor = 1.0) {
         const absDev = Math.abs(deviation);
+        // 基础概率（仅基于偏离度）
         const baseProb = 0.5 + 0.45 * (1 - Math.exp(-3 * absDev));
-        const adjustedProb = 0.5 + (baseProb - 0.5) * timeFactor;
+        // 时间衰减：剩余时间越少，概率越低（向0%收敛）
+        // 时间不够了，均值回归不可能发生
+        const adjustedProb = baseProb * timeFactor;
         return Math.min(0.95, Math.max(0.05, adjustedProb));
     }
     
