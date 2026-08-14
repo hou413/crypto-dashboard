@@ -1,0 +1,41 @@
+{
+  "timestamp": "2026-08-14T11:10:09.647708+08:00",
+  "1h": {
+    "signal": null,
+    "deviation": -0.13996343517127408,
+    "price": 63449.45,
+    "ma": 63538.38049999999,
+    "probability": 0.6542964958182896,
+    "trend": "TRENDING_DOWN",
+    "trend_blocked": true,
+    "original_signal": "UP",
+    "ema_signal": null,
+    "ema_deviation": -0.10948040708306038,
+    "ema": 63518.99084975736,
+    "ema_slope": -0.005102789893989773,
+    "ema_dynamic_threshold": 0.4,
+    "ema_threshold_multiplier": 1.0,
+    "ema_probability": 0.6259796373459489,
+    "ema_trend_blocked": true,
+    "ema_original_signal": "UP"
+  },
+  "4h": {
+    "signal": null,
+    "deviation": -0.4671051009733188,
+    "price": 63449.45,
+    "ma": 63747.2165,
+    "probability": 0.8391772276472982,
+    "trend": "TRENDING_DOWN",
+    "trend_blocked": true,
+    "original_signal": "UP",
+    "ema_signal": null,
+    "ema_deviation": -0.5592163745017645,
+    "ema": 63806.26508229821,
+    "ema_slope": -0.28551474734355065,
+    "ema_dynamic_threshold": 2.25,
+    "ema_threshold_multiplier": 1.5,
+    "ema_probability": 0.8659343148566825,
+    "ema_trend_blocked": true,
+    "ema_original_signal": "UP"
+  }
+}

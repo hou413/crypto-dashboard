@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>DNF 策略看板</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #0a0e17; 
+            color: #e0e6ed; 
+            font-family: -apple-system, sans-serif; 
+            padding: 20px; 
+        }
+        h1 { 
+            font-size: 20px; 
+            margin-bottom: 20px; 
+            background: linear-gradient(135deg, #00d4ff, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .period { 
+            margin-bottom: 30px; 
+            background: #131a2b;
+            border: 1px solid #1e2a42;
+            border-radius: 10px;
+            padding: 16px;
+        }
+        .period-title { 
+            font-size: 16px; 
+            font-weight: 600; 
+            margin-bottom: 12px;
+        }
+        .period-title.p5m { color: #00d4ff; }
+        .period-title.p1h { color: #ffd700; }
+        .period-title.p4h { color: #a855f7; }
+        
+        /* 多维表格 */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        .data-table th {
+            text-align: left;
+            padding: 10px 12px;
+            font-size: 11px;
+            color: #8892a4;
+            background: #0f1520;
+            border-bottom: 2px solid #1e2a42;
+            position: sticky;
+            top: 0;
+        }
+        .data-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #1e2a42;
+        }
+        .data-table tr:hover td { background: #1a223566; }
+        
+        /* 数值样式 */
+        .num-up { color: #00ff88; font-weight: 600; }
+        .num-down { color: #ff4757; font-weight: 600; }
+        .num-zero { color: #5a6577; }
+        
+        .trend-up { color: #00d4ff; }
+        .trend-down { color: #ff8c00; }
+        .trend-range { color: #8892a4; }
+        
+        .result-up { 
+            color: #00ff88; 
+            font-weight: 700;
+            background: rgba(0,255,136,0.15);
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+        .result-down { 
+            color: #ff4757; 
+            font-weight: 700;
+            background: rgba(255,71,87,0.15);
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+        .result-na { color: #3a4657; }
+        
+        .price { color: #e0e6ed; font-family: monospace; }
+        .ma { color: #00d4ff; font-family: monospace; }
+        .ema { color: #a855f7; font-family: monospace; }
+        
+        .table-wrap {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #1e2a42;
+            border-radius: 6px;
+        }
+        
+        /* 统计卡片 */
+        .stats {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .stat-card {
+            flex: 1;
+            background: #0f1520;
+            border: 1px solid #1e2a42;
+            border-radius: 6px;
+            padding: 10px 14px;
+            text-align: center;
+        }
+        .stat-label {
+            font-size: 10px;
+            color: #5a6577;
+            margin-bottom: 4px;
+        }
+        .stat-value {
+            font-size: 18px;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 DNF 策略多维数据表</h1>
+    <div id="tables"></div>
+    
+    <script>
+        let historyData = [];
+        const PERIODS = [
+            { key: '5M', dataKey: '5m', threshold: 0.3 },
+            { key: '1H', dataKey: '1h', threshold: 0.4 },
+            { key: '4H', dataKey: '4h', threshold: 1.5 },
+        ];
+        
+        async function loadData() {
+            try {
+                const r = await fetch('data/signal_history.json?t=' + Date.now());
+                if (r.ok) historyData = await r.json();
+            } catch(e) {}
+            render();
+        }
+        
+        function render() {
+            const container = document.getElementById('tables');
+            container.innerHTML = '';
+            
+            PERIODS.forEach(p => {
+                const records = getRecords(p.key);
+                const stats = calcStats(records);
+                
+                const div = document.createElement('div');
+                div.className = 'period';
+                div.innerHTML = `
+                    <div class="period-title p${p.key.toLowerCase()}">${p.key} - 阈值 ${p.threshold}%</div>
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="stat-label">总轮次</div>
+                            <div class="stat-value" style="color:#00d4ff">${stats.total}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">涨 / 跌</div>
+                            <div class="stat-value"><span style="color:#00ff88">${stats.up}</span> / <span style="color:#ff4757">${stats.down}</span></div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">最大偏离</div>
+                            <div class="stat-value" style="color:#ffd700">${stats.maxDev.toFixed(2)}%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">平均偏离</div>
+                            <div class="stat-value" style="color:#a855f7">${stats.avgDev.toFixed(2)}%</div>
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        ${renderTable(records, p)}
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+        
+        function getRecords(period) {
+            const records = [];
+            historyData.forEach(entry => {
+                const rec = (entry.records || {})[period];
+                if (rec) {
+                    records.push({
+                        time: entry.timestamp,
+                        epoch: entry.epoch,
+                        deviation: rec.deviation || 0,
+                        price: rec.price || 0,
+                        ma: rec.ma || 0,
+                        ema: rec.ema || 0,
+                        ema_deviation: rec.ema_deviation || 0,
+                        trend: rec.trend || 'RANGING',
+                        actual_result: rec.actual_result || null,
+                    });
+                }
+            });
+            return records.sort((a, b) => a.epoch - b.epoch);
+        }
+        
+        function calcStats(records) {
+            const total = records.length;
+            const up = records.filter(r => r.actual_result === 'UP').length;
+            const down = records.filter(r => r.actual_result === 'DOWN').length;
+            const maxDev = Math.max(...records.map(r => Math.abs(r.deviation)), 0);
+            const avgDev = records.length > 0 ? records.reduce((sum, r) => sum + Math.abs(r.deviation), 0) / records.length : 0;
+            return { total, up, down, maxDev, avgDev };
+        }
+        
+        function renderTable(records, p) {
+            const recent = records.slice(-50).reverse();
+            if (recent.length === 0) {
+                return '<div style="text-align:center;padding:40px;color:#3a4657">等待数据...</div>';
+            }
+            
+            let html = `<table class="data-table">
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>价格</th>
+                        <th>MA偏离</th>
+                        <th>MA值</th>
+                        <th>EMA偏离</th>
+                        <th>EMA值</th>
+                        <th>趋势</th>
+                        <th>结果</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+            
+            recent.forEach(r => {
+                const t = new Date(r.time);
+                const timeStr = (t.getMonth()+1) + '/' + t.getDate() + ' ' + t.getHours() + ':' + String(t.getMinutes()).padStart(2, '0');
+                
+                // 价格
+                const priceStr = '$' + (r.price || 0).toLocaleString(undefined, {maximumFractionDigits: 0});
+                
+                // MA偏离
+                const dev = r.deviation || 0;
+                const devClass = dev > 0 ? 'num-up' : dev < 0 ? 'num-down' : 'num-zero';
+                const devStr = (dev > 0 ? '+' : '') + dev.toFixed(2) + '%';
+                
+                // MA值
+                const maStr = r.ma ? '$' + r.ma.toLocaleString(undefined, {maximumFractionDigits: 0}) : '-';
+                
+                // EMA偏离
+                const emaDev = r.ema_deviation || 0;
+                const emaDevClass = emaDev > 0 ? 'num-up' : emaDev < 0 ? 'num-down' : 'num-zero';
+                const emaDevStr = (emaDev > 0 ? '+' : '') + emaDev.toFixed(2) + '%';
+                
+                // EMA值
+                const emaStr = r.ema ? '$' + r.ema.toLocaleString(undefined, {maximumFractionDigits: 0}) : '-';
+                
+                // 趋势
+                const trendMap = {
+                    'TRENDING_UP': { label: '📈上升', cls: 'trend-up' },
+                    'TRENDING_DOWN': { label: '📉下降', cls: 'trend-down' },
+                    'RANGING': { label: '↔️震荡', cls: 'trend-range' },
+                };
+                const trend = trendMap[r.trend] || trendMap['RANGING'];
+                
+                // 结果
+                let resultHtml;
+                if (r.actual_result === 'UP') {
+                    resultHtml = '<span class="result-up">▲ UP</span>';
+                } else if (r.actual_result === 'DOWN') {
+                    resultHtml = '<span class="result-down">▼ DOWN</span>';
+                } else {
+                    resultHtml = '<span class="result-na">-</span>';
+                }
+                
+                html += `<tr>
+                    <td>${timeStr}</td>
+                    <td class="price">${priceStr}</td>
+                    <td class="${devClass}">${devStr}</td>
+                    <td class="ma">${maStr}</td>
+                    <td class="${emaDevClass}">${emaDevStr}</td>
+                    <td class="ema">${emaStr}</td>
+                    <td class="${trend.cls}">${trend.label}</td>
+                    <td>${resultHtml}</td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table>';
+            return html;
+        }
+        
+        loadData();
+        setInterval(loadData, 30000);
+    </script>
+</body>
+</html>

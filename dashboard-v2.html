@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>DNF + HBW Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #fff; color: #1a1a2e; font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 16px; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 2px solid #f0f0f5; }
+        .header h1 { font-size: 18px; }
+        .header h1 span { background: linear-gradient(135deg, #6366f1, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .price { font-size: 16px; font-weight: 600; color: #6366f1; }
+        .time { font-size: 11px; color: #9ca3af; }
+        
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        
+        .card { background: #fafafa; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .card-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+        .card-title.p4h { color: #6366f1; }
+        .card-title.p1h { color: #f59e0b; }
+        .badge { font-size: 9px; padding: 2px 5px; border-radius: 6px; }
+        .badge-main { background: #eef2ff; color: #6366f1; }
+        .badge-ref { background: #fef3c7; color: #d97706; }
+        
+        .round-time { font-size: 11px; color: #6b7280; background: #f3f4f6; padding: 2px 8px; border-radius: 10px; }
+        
+        .strategy { margin-bottom: 10px; padding: 8px 10px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; }
+        .strategy:last-child { margin-bottom: 0; }
+        .strategy-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .strategy-name { font-size: 12px; font-weight: 600; }
+        .strategy-name.dnf { color: #10b981; }
+        .strategy-name.hbw { color: #8b5cf6; }
+        
+        .signal { font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 5px; }
+        .signal-up { background: #d1fae5; color: #059669; }
+        .signal-down { background: #fee2e2; color: #dc2626; }
+        .signal-none { background: #f3f4f6; color: #6b7280; }
+        .signal-blocked { background: #fef3c7; color: #d97706; }
+        
+        .metrics { display: flex; gap: 10px; font-size: 11px; color: #6b7280; margin-top: 4px; }
+        .metric { display: flex; flex-direction: column; }
+        .metric-label { font-size: 9px; color: #9ca3af; text-transform: uppercase; }
+        .metric-value { font-weight: 600; color: #374151; }
+        
+        .target-price { font-size: 11px; color: #6b7280; margin-bottom: 4px; }
+        
+        .prob-bar { height: 18px; background: #f3f4f6; border-radius: 9px; overflow: hidden; display: flex; margin: 4px 0; }
+        .prob-up { background: linear-gradient(90deg, #10b981, #34d399); height: 100%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 9px; font-weight: 600; }
+        .prob-down { background: linear-gradient(90deg, #f87171, #ef4444); height: 100%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 9px; font-weight: 600; }
+        
+        .ev-line { font-size: 11px; margin-top: 3px; }
+        .ev-positive { color: #059669; font-weight: 600; }
+        .progress-text { color: #4f46e5; font-size: 11px; }
+        
+        .loading { text-align: center; padding: 40px; color: #9ca3af; }
+        
+        @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>📊 <span>DNF + HBW</span></h1>
+            <div class="time" id="update-time">加载中...</div>
+        </div>
+        <div class="price" id="btc-price">--</div>
+    </div>
+    
+    <div id="content" class="grid">
+        <div class="loading">加载数据...</div>
+    </div>
+    
+    <script>
+        async function loadJSON(url) {
+            try {
+                const resp = await fetch(url + '?t=' + Date.now(), { cache: 'no-cache' });
+                return resp.ok ? await resp.json() : null;
+            } catch { return null; }
+        }
+        
+        function formatRoundTime(eventStart, period) {
+            if (!eventStart) return '';
+            try {
+                const start = new Date(eventStart);
+                const hours = period === '4H' ? 4 : 1;
+                const end = new Date(start.getTime() + hours * 60 * 60 * 1000);
+                const startStr = start.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Shanghai' });
+                const endStr = end.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Shanghai' });
+                return `${startStr}-${endStr}`;
+            } catch { return ''; }
+        }
+        
+        function getProgress(eventStart, period) {
+            if (!eventStart) return null;
+            try {
+                const start = new Date(eventStart);
+                const hours = period === '4H' ? 4 : 1;
+                const end = new Date(start.getTime() + hours * 60 * 60 * 1000);
+                const now = new Date();
+                const total = end - start;
+                const elapsed = now - start;
+                const remaining = end - now;
+                if (remaining <= 0) return { elapsed: 1, remaining: 0, ended: true };
+                if (elapsed < 0) return { elapsed: 0, remaining: total, ended: false };
+                return { elapsed: elapsed / total, remaining: remaining / 60000, ended: false };
+            } catch { return null; }
+        }
+        
+        function renderPeriod(period, dnf, hbw) {
+            const titleClass = period === '4H' ? 'p4h' : 'p1h';
+            const badge = period === '4H' ? '<span class="badge badge-main">主阵地</span>' : '<span class="badge badge-ref">参考</span>';
+            
+            // 获取轮次时间
+            const eventStart = hbw?.polymarket?.event_start;
+            const roundTime = formatRoundTime(eventStart, period);
+            const progress = getProgress(eventStart, period);
+            
+            // DNF 信号
+            let dnfSignal = '⚪ 无信号', dnfClass = 'signal-none';
+            if (dnf) {
+                const blocked = dnf.trend_blocked;
+                const sig = blocked ? null : dnf.signal;
+                const prob = dnf.probability || 0.5;
+                const original = dnf.original_signal;
+                if (blocked) {
+                    dnfSignal = `🚫 过滤 ${original || ''}`;
+                    dnfClass = 'signal-blocked';
+                } else if (sig) {
+                    dnfSignal = `${sig === 'UP' ? '🟢' : '🔴'} ${sig} ${(prob*100).toFixed(0)}%`;
+                    dnfClass = sig === 'UP' ? 'signal-up' : 'signal-down';
+                }
+            }
+            
+            // DNF 指标
+            let dnfMetrics = '';
+            if (dnf) {
+                const dev = dnf.deviation || 0;
+                const ma = dnf.ma || 0;
+                const trend = dnf.trend || '';
+                const trendIcon = trend === 'TRENDING_UP' ? '📈' : trend === 'TRENDING_DOWN' ? '📉' : '↔️';
+                dnfMetrics = `
+                    <div class="metrics">
+                        <div class="metric"><span class="metric-label">MA20</span><span class="metric-value">$${ma.toLocaleString('en-US', {maximumFractionDigits:0})}</span></div>
+                        <div class="metric"><span class="metric-label">偏离</span><span class="metric-value">${dev >= 0 ? '+' : ''}${dev.toFixed(2)}%</span></div>
+                        <div class="metric"><span class="metric-label">趋势</span><span class="metric-value">${trendIcon}</span></div>
+                    </div>
+                `;
+            }
+            
+            // HBW 内容
+            let hbwContent = '';
+            if (hbw) {
+                const pUp = hbw.p_up || 0.5;
+                const pDown = hbw.p_down || 0.5;
+                const dec = hbw.decision || {};
+                const pm = hbw.polymarket;
+                const targetPrice = hbw.target_price;
+                const isProgressOnly = dec.progress_only || false;
+                
+                // Target Price
+                if (targetPrice) {
+                    const price = parseFloat(document.getElementById('btc-price').textContent.replace(/[^0-9.]/g, '')) || 0;
+                    const deviation = price ? ((price - targetPrice) / targetPrice * 100).toFixed(2) : 0;
+                    hbwContent += `<div class="target-price">🎯 Target: $${targetPrice.toLocaleString('en-US', {maximumFractionDigits:2})} (${deviation >= 0 ? '+' : ''}${deviation}%)</div>`;
+                }
+                
+                if (isProgressOnly || (progress && progress.elapsed >= 0.5)) {
+                    // 进度模式：已过 50%+
+                    const elapsedPct = ((dec.elapsed_ratio || progress?.elapsed || 0) * 100).toFixed(0);
+                    const remainMin = (dec.remaining_min || progress?.remaining || 0).toFixed(0);
+                    hbwContent += `
+                        <div class="progress-text">⏱️ 已过 ${elapsedPct}%，剩余 ${remainMin} 分钟</div>
+                    `;
+                } else {
+                    // 正常模式：显示概率条
+                    hbwContent += `
+                        <div class="prob-bar">
+                            <div class="prob-up" style="width:${pUp*100}%">UP ${(pUp*100).toFixed(0)}%</div>
+                            <div class="prob-down" style="width:${pDown*100}%">DOWN ${(pDown*100).toFixed(0)}%</div>
+                        </div>
+                    `;
+                }
+                
+                // 定价
+                if (pm) {
+                    hbwContent += `<div style="font-size:10px;color:#9ca3af">UP$${(pm.up_price||0).toFixed(3)} DOWN$${(pm.down_price||0).toFixed(3)}</div>`;
+                }
+                
+                // 决策
+                if (dec.action && dec.action !== 'NO BET') {
+                    const evPct = (dec.ev * 100).toFixed(1);
+                    const signal = dec.action.includes('UP') ? '🟢UP' : '🔴DOWN';
+                    hbwContent += `<div class="ev-line">${signal} <span class="ev-positive">EV +${evPct}%</span> $${dec.position_usd || 0}</div>`;
+                } else {
+                    hbwContent += `<div class="ev-line" style="color:#9ca3af">🚫 DONT BE GREEDY</div>`;
+                }
+            }
+            
+            return `
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title ${titleClass}">${period} ${badge}</div>
+                        ${roundTime ? `<div class="round-time">${roundTime}</div>` : ''}
+                    </div>
+                    <div class="strategy">
+                        <div class="strategy-header">
+                            <span class="strategy-name dnf">DNF 均值回归</span>
+                            <span class="signal ${dnfClass}">${dnfSignal}</span>
+                        </div>
+                        ${dnfMetrics}
+                    </div>
+                    <div class="strategy">
+                        <div class="strategy-header">
+                            <span class="strategy-name hbw">HBW 概率估算</span>
+                        </div>
+                        ${hbwContent}
+                    </div>
+                </div>
+            `;
+        }
+        
+        async function render() {
+            const [dnf, hbw] = await Promise.all([
+                loadJSON('data/mean_reversion_signals.json'),
+                loadJSON('data/hbw_signals.json')
+            ]);
+            
+            if (!dnf && !hbw) {
+                document.getElementById('content').innerHTML = '<div class="loading">❌ 无法加载数据</div>';
+                return;
+            }
+            
+            // 更新头部
+            const price = (dnf?.['4h']?.price) || (hbw?.price) || 0;
+            if (price) document.getElementById('btc-price').textContent = '$' + price.toLocaleString('en-US', {maximumFractionDigits: 2});
+            
+            const ts = dnf?.timestamp || hbw?.timestamp;
+            if (ts) {
+                const fixed = ts.replace(/(\.\d{3})\d+/, '$1');
+                document.getElementById('update-time').textContent = '更新于 ' + new Date(fixed).toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' });
+            }
+            
+            // 渲染
+            const dnf4h = dnf?.['4h'] || null;
+            const dnf1h = dnf?.['1h'] || null;
+            const hbw4h = hbw?.periods?.['4H'] || null;
+            const hbw1h = hbw?.periods?.['1H'] || null;
+            
+            document.getElementById('content').innerHTML = 
+                renderPeriod('4H', dnf4h, hbw4h) +
+                renderPeriod('1H', dnf1h, hbw1h);
+        }
+        
+        render();
+        setInterval(render, 30000);
+    </script>
+</body>
+</html>
