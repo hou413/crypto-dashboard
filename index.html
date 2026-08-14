@@ -378,7 +378,7 @@
         return Math.min(0.95, Math.max(0.05, adjustedProb));
     }
     
-    // 计算时间因子（基于剩余时间占比）
+    // 计算时间因子（基于剩余时间占比）- 平方根衰减
     function calcTimeFactor(eventStart, period) {
         if (!eventStart) return 1.0;
         try {
@@ -389,23 +389,16 @@
             const remaining = end - now;
             const total = end - start;
             
-            if (remaining <= 0) return 0.1;
-            if (remaining >= total) return 1.0;
+            if (remaining <= 0) return 0.1; // 已结束，极低因子
+            if (remaining >= total) return 1.0; // 刚开始，完整因子
             
             const remainingRatio = remaining / total;
             
-            let factor;
-            if (remainingRatio > 0.6) {
-                factor = 1.0;
-            } else if (remainingRatio > 0.3) {
-                factor = 0.8 + (remainingRatio - 0.3) / 0.3 * 0.2;
-            } else if (remainingRatio > 0.1) {
-                factor = 0.5 + (remainingRatio - 0.1) / 0.2 * 0.3;
-            } else {
-                factor = 0.2 + remainingRatio / 0.1 * 0.3;
-            }
+            // 平方根衰减：前期衰减慢，后期衰减快
+            // 给均值回归足够时间，但后期快速降低置信度
+            const factor = Math.sqrt(remainingRatio);
             
-            return factor;
+            return Math.max(0.1, factor); // 最低 10%
         } catch {
             return 1.0;
         }
