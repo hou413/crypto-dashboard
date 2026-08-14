@@ -600,7 +600,8 @@
         let dnfSignal = '⚪ 无信号', dnfClass = 'signal-none';
         if (dnf) {
             if (dnf.trendBlocked) {
-                dnfSignal = `🚫过滤 ${dnf.originalSignal || ''}`;
+                const prob = (dnf.probability * 100).toFixed(0);
+                dnfSignal = `🚫过滤 ${dnf.originalSignal || ''} ${prob}%`;
                 dnfClass = 'signal-blocked';
             } else if (dnf.signal) {
                 const prob = (dnf.probability * 100).toFixed(0);
