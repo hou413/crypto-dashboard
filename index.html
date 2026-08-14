@@ -269,48 +269,94 @@
             font-size: 14px;
             color: #6b7280;
         }
-        .momentum-charts {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-        }
-        @media (max-width: 900px) { .momentum-charts { grid-template-columns: 1fr; } }
-        .chart-card {
-            background: #f9fafb;
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            padding: 16px;
-        }
-        .chart-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: #374151;
-            margin-bottom: 12px;
-        }
-        .chart-container {
+        .momentum-chart-container {
             position: relative;
-            height: 120px;
+            height: 200px;
             width: 100%;
+            margin-bottom: 16px;
         }
-        .chart-canvas {
+        .momentum-canvas {
             width: 100%;
             height: 100%;
         }
-        .chart-legend {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 8px;
-            font-size: 11px;
+        .momentum-indicators {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        @media (max-width: 768px) {
+            .momentum-indicators { grid-template-columns: 1fr; }
+        }
+        .indicator-item {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+        }
+        .indicator-label {
+            font-size: 13px;
             color: #6b7280;
+            margin-bottom: 6px;
         }
-        .chart-value {
-            font-size: 18px;
+        .indicator-value {
+            font-size: 24px;
             font-weight: 700;
-            margin-top: 8px;
+            color: #1f2937;
+            margin-bottom: 4px;
         }
-        .chart-value.positive { color: #059669; }
-        .chart-value.negative { color: #dc2626; }
-        .chart-value.warning { color: #d97706; }
+        .indicator-status {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 6px;
+            display: inline-block;
+        }
+        .indicator-status.normal {
+            background: #d1fae5;
+            color: #059669;
+        }
+        .indicator-status.warning {
+            background: #fef3c7;
+            color: #d97706;
+        }
+        .indicator-status.danger {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        .momentum-guide {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .guide-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #0369a1;
+            margin-bottom: 12px;
+        }
+        .guide-content {
+            font-size: 13px;
+            color: #374151;
+            line-height: 1.6;
+        }
+        .guide-item {
+            margin-bottom: 8px;
+        }
+        .guide-icon {
+            margin-right: 6px;
+        }
+        .guide-warning {
+            margin-top: 12px;
+            padding: 10px;
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            font-weight: 600;
+            color: #92400e;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -335,38 +381,43 @@
             <div class="momentum-title">📈 市场动量监控</div>
             <div class="momentum-subtitle">4H 周期 · 反转预警指标</div>
         </div>
-        <div class="momentum-charts">
-            <div class="chart-card">
-                <div class="chart-title">💹 Taker 买卖比</div>
-                <div class="chart-container">
-                    <canvas id="chart-taker" class="chart-canvas"></canvas>
-                </div>
-                <div class="chart-legend">
-                    <span>买方主导</span>
-                    <span id="taker-current">--</span>
-                    <span>卖方主导</span>
-                </div>
+        <div class="momentum-chart-container">
+            <canvas id="momentum-chart" class="momentum-canvas"></canvas>
+        </div>
+        <div class="momentum-indicators">
+            <div class="indicator-item">
+                <div class="indicator-label">💹 Taker 买卖比</div>
+                <div class="indicator-value" id="taker-value">--</div>
+                <div class="indicator-status" id="taker-status">正常</div>
             </div>
-            <div class="chart-card">
-                <div class="chart-title">📊 成交量突增</div>
-                <div class="chart-container">
-                    <canvas id="chart-volume" class="chart-canvas"></canvas>
-                </div>
-                <div class="chart-legend">
-                    <span>正常</span>
-                    <span id="volume-current">--</span>
-                    <span>异常</span>
-                </div>
+            <div class="indicator-item">
+                <div class="indicator-label">📊 成交量倍数</div>
+                <div class="indicator-value" id="volume-value">--</div>
+                <div class="indicator-status" id="volume-status">正常</div>
             </div>
-            <div class="chart-card">
-                <div class="chart-title">🕯️ K线实体大小</div>
-                <div class="chart-container">
-                    <canvas id="chart-body" class="chart-canvas"></canvas>
+            <div class="indicator-item">
+                <div class="indicator-label">🕯️ K线实体</div>
+                <div class="indicator-value" id="body-value">--</div>
+                <div class="indicator-status" id="body-status">正常</div>
+            </div>
+        </div>
+        <div class="momentum-guide">
+            <div class="guide-title">📖 如何解读</div>
+            <div class="guide-content">
+                <div class="guide-item">
+                    <span class="guide-icon">💹</span>
+                    <span><strong>Taker 买卖比：</strong>超过 65% 表示一方主导，可能反转</span>
                 </div>
-                <div class="chart-legend">
-                    <span>小实体</span>
-                    <span id="body-current">--</span>
-                    <span>大实体</span>
+                <div class="guide-item">
+                    <span class="guide-icon">📊</span>
+                    <span><strong>成交量倍数：</strong>超过 2.0x 表示异常放量，趋势可能延续</span>
+                </div>
+                <div class="guide-item">
+                    <span class="guide-icon">🕯️</span>
+                    <span><strong>K线实体：</strong>超过 1.5% 或连续 3 根 >1.0% 表示强趋势</span>
+                </div>
+                <div class="guide-warning">
+                    ⚠️ 当三个指标同时触发预警时，建议放弃当前预测
                 </div>
             </div>
         </div>
@@ -947,7 +998,7 @@
             const avgVolume = klines4h.reduce((sum, k) => sum + k.volume, 0) / klines4h.length;
             
             klines4h.forEach(k => {
-                // 1. Taker 买卖比
+                // 1. Taker 买卖比 (0-1)
                 const takerRatio = k.takerBuyVolume / k.volume;
                 takerRatios.push(takerRatio);
                 
@@ -960,103 +1011,182 @@
                 bodySizes.push(bodySize);
             });
             
-            // 绘制图表
-            drawLineChart('chart-taker', takerRatios, '#10b981', 0, 1);
-            drawLineChart('chart-volume', volumeRatios, '#f59e0b', 0, Math.max(...volumeRatios) * 1.2);
-            drawLineChart('chart-body', bodySizes, '#8b5cf6', 0, Math.max(...bodySizes) * 1.2);
+            // 绘制合并图表
+            drawCombinedChart(takerRatios, volumeRatios, bodySizes);
             
-            // 更新当前值显示
+            // 更新指标数值和状态
             const currentTaker = takerRatios[takerRatios.length - 1];
-            document.getElementById('taker-current').textContent = `买 ${(currentTaker * 100).toFixed(1)}%`;
-            
             const currentVolume = volumeRatios[volumeRatios.length - 1];
-            const volumeEl = document.getElementById('volume-current');
-            volumeEl.textContent = `${currentVolume.toFixed(2)}x`;
-            volumeEl.className = currentVolume > 1.5 ? 'chart-value warning' : 'chart-value';
-            
             const currentBody = bodySizes[bodySizes.length - 1];
-            const bodyEl = document.getElementById('body-current');
-            bodyEl.textContent = `${currentBody.toFixed(2)}%`;
-            bodyEl.className = currentBody > 1.0 ? 'chart-value negative' : 'chart-value';
+            
+            // Taker 买卖比
+            const takerValEl = document.getElementById('taker-value');
+            const takerStatusEl = document.getElementById('taker-status');
+            takerValEl.textContent = (currentTaker * 100).toFixed(1) + '%';
+            if (currentTaker > 0.65 || currentTaker < 0.35) {
+                takerStatusEl.textContent = '⚠️ 反转风险';
+                takerStatusEl.className = 'indicator-status danger';
+            } else if (currentTaker > 0.60 || currentTaker < 0.40) {
+                takerStatusEl.textContent = '⚡ 预警';
+                takerStatusEl.className = 'indicator-status warning';
+            } else {
+                takerStatusEl.textContent = '✅ 正常';
+                takerStatusEl.className = 'indicator-status normal';
+            }
+            
+            // 成交量倍数
+            const volumeValEl = document.getElementById('volume-value');
+            const volumeStatusEl = document.getElementById('volume-status');
+            volumeValEl.textContent = currentVolume.toFixed(2) + 'x';
+            if (currentVolume > 2.0) {
+                volumeStatusEl.textContent = '⚠️ 反转风险';
+                volumeStatusEl.className = 'indicator-status danger';
+            } else if (currentVolume > 1.5) {
+                volumeStatusEl.textContent = '⚡ 预警';
+                volumeStatusEl.className = 'indicator-status warning';
+            } else {
+                volumeStatusEl.textContent = '✅ 正常';
+                volumeStatusEl.className = 'indicator-status normal';
+            }
+            
+            // K线实体
+            const bodyValEl = document.getElementById('body-value');
+            const bodyStatusEl = document.getElementById('body-status');
+            bodyValEl.textContent = currentBody.toFixed(2) + '%';
+            if (currentBody > 1.5) {
+                bodyStatusEl.textContent = '⚠️ 反转风险';
+                bodyStatusEl.className = 'indicator-status danger';
+            } else if (currentBody > 1.0) {
+                bodyStatusEl.textContent = '⚡ 预警';
+                bodyStatusEl.className = 'indicator-status warning';
+            } else {
+                bodyStatusEl.textContent = '✅ 正常';
+                bodyStatusEl.className = 'indicator-status normal';
+            }
             
         } catch (e) {
             console.error('Momentum monitor error:', e);
         }
     }
     
-    function drawLineChart(canvasId, data, color, minVal, maxVal) {
-        const canvas = document.getElementById(canvasId);
+    function drawCombinedChart(takerData, volumeData, bodyData) {
+        const canvas = document.getElementById('momentum-chart');
         if (!canvas) return;
         
         const ctx = canvas.getContext('2d');
-        const width = canvas.width = canvas.offsetWidth;
-        const height = canvas.height = canvas.offsetHeight;
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+        
+        const width = rect.width;
+        const height = rect.height;
+        const padding = { top: 20, right: 60, bottom: 30, left: 50 };
+        const chartWidth = width - padding.left - padding.right;
+        const chartHeight = height - padding.top - padding.bottom;
         
         // 清空画布
         ctx.clearRect(0, 0, width, height);
         
-        if (data.length === 0) return;
+        const len = takerData.length;
+        if (len === 0) return;
         
-        // 计算坐标
-        const padding = 10;
-        const chartWidth = width - padding * 2;
-        const chartHeight = height - padding * 2;
-        const range = maxVal - minVal || 1;
-        
-        const points = data.map((val, i) => ({
-            x: padding + (i / (data.length - 1)) * chartWidth,
-            y: padding + chartHeight - ((val - minVal) / range) * chartHeight
-        }));
-        
-        // 绘制背景网格
+        // 背景网格
         ctx.strokeStyle = '#e5e7eb';
         ctx.lineWidth = 1;
         for (let i = 0; i <= 4; i++) {
-            const y = padding + (i / 4) * chartHeight;
+            const y = padding.top + (i / 4) * chartHeight;
             ctx.beginPath();
-            ctx.moveTo(padding, y);
-            ctx.lineTo(width - padding, y);
+            ctx.moveTo(padding.left, y);
+            ctx.lineTo(width - padding.right, y);
             ctx.stroke();
         }
         
-        // 绘制折线
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
+        // 绘制预警线
+        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 1;
+        
+        // Taker 65% 线
+        const taker65Y = padding.top + (1 - 0.65) * chartHeight;
+        ctx.strokeStyle = '#fca5a5';
         ctx.beginPath();
-        points.forEach((p, i) => {
-            if (i === 0) ctx.moveTo(p.x, p.y);
-            else ctx.lineTo(p.x, p.y);
-        });
+        ctx.moveTo(padding.left, taker65Y);
+        ctx.lineTo(width - padding.right, taker65Y);
         ctx.stroke();
         
-        // 绘制渐变填充
-        const gradient = ctx.createLinearGradient(0, padding, 0, height - padding);
-        gradient.addColorStop(0, color + '40');
-        gradient.addColorStop(1, color + '00');
-        
-        ctx.fillStyle = gradient;
+        // Volume 2.0x 线
+        const maxVol = Math.max(...volumeData) * 1.2;
+        const vol2Y = padding.top + (1 - 2.0 / maxVol) * chartHeight;
+        ctx.strokeStyle = '#fcd34d';
         ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        points.forEach(p => ctx.lineTo(p.x, p.y));
-        ctx.lineTo(points[points.length - 1].x, height - padding);
-        ctx.lineTo(points[0].x, height - padding);
-        ctx.closePath();
-        ctx.fill();
+        ctx.moveTo(padding.left, vol2Y);
+        ctx.lineTo(width - padding.right, vol2Y);
+        ctx.stroke();
         
-        // 绘制当前值点
-        const lastPoint = points[points.length - 1];
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(lastPoint.x, lastPoint.y, 4, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.setLineDash([]);
         
-        // 白色内圈
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(lastPoint.x, lastPoint.y, 2, 0, Math.PI * 2);
-        ctx.fill();
+        // 绘制三条线
+        function drawLine(data, color, maxVal) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            data.forEach((val, i) => {
+                const x = padding.left + (i / (len - 1)) * chartWidth;
+                const y = padding.top + (1 - val / maxVal) * chartHeight;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            
+            // 最后一个点
+            const lastX = padding.left + ((len - 1) / (len - 1)) * chartWidth;
+            const lastY = padding.top + (1 - data[len - 1] / maxVal) * chartHeight;
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(lastX, lastY, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // Taker ratio (0-1)
+        drawLine(takerData, '#10b981', 1);
+        // Volume ratio
+        drawLine(volumeData, '#f59e0b', maxVol);
+        // Body size (0-3%)
+        const maxBody = Math.max(...bodyData) * 1.2;
+        drawLine(bodyData, '#8b5cf6', maxBody);
+        
+        // 图例
+        const legendY = height - 10;
+        ctx.font = '11px -apple-system, sans-serif';
+        
+        ctx.fillStyle = '#10b981';
+        ctx.fillRect(padding.left, legendY - 8, 12, 3);
+        ctx.fillStyle = '#6b7280';
+        ctx.fillText('Taker', padding.left + 16, legendY - 3);
+        
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(padding.left + 60, legendY - 8, 12, 3);
+        ctx.fillStyle = '#6b7280';
+        ctx.fillText('成交量', padding.left + 76, legendY - 3);
+        
+        ctx.fillStyle = '#8b5cf6';
+        ctx.fillRect(padding.left + 120, legendY - 8, 12, 3);
+        ctx.fillStyle = '#6b7280';
+        ctx.fillText('实体', padding.left + 136, legendY - 3);
+        
+        // 右侧标注预警线
+        ctx.font = '10px -apple-system, sans-serif';
+        ctx.fillStyle = '#fca5a5';
+        ctx.fillText('Taker 65%', width - padding.right + 4, taker65Y + 3);
+        ctx.fillStyle = '#fcd34d';
+        ctx.fillText('Vol 2.0x', width - padding.right + 4, vol2Y + 3);
     }
     
     // 初始化动量监控
