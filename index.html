@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNF + HBW Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #fff; color: #1a1a2e; font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 16px; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 2px solid #f0f0f5; }
+        .header h1 { font-size: 18px; }
+        .header h1 span { background: linear-gradient(135deg, #6366f1, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .price { font-size: 16px; font-weight: 600; color: #6366f1; }
+        .time { font-size: 11px; color: #9ca3af; }
+        
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        
+        .card { background: #fafafa; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .card-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+        .card-title.p4h { color: #6366f1; }
+        .card-title.p1h { color: #f59e0b; }
+        .badge { font-size: 9px; padding: 2px 5px; border-radius: 6px; }
+        .badge-main { background: #eef2ff; color: #6366f1; }
+        .badge-ref { background: #fef3c7; color: #d97706; }
+        
+        .round-time { font-size: 11px; color: #6b7280; background: #f3f4f6; padding: 2px 8px; border-radius: 10px; }
+        
+        .strategy { margin-bottom: 10px; padding: 8px 10px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; }
+        .strategy:last-child { margin-bottom: 0; }
+        .strategy-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .strategy-name { font-size: 12px; font-weight: 600; }
+        .strategy-name.dnf { color: #10b981; }
+        .strategy-name.hbw { color: #8b5cf6; }
+        
+        .signal { font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 5px; }
+        .signal-up { background: #d1fae5; color: #059669; }
+        .signal-down { background: #fee2e2; color: #dc2626; }
+        .signal-none { background: #f3f4f6; color: #6b7280; }
+        .signal-blocked { background: #fef3c7; color: #d97706; }
+        
+        .metrics { display: flex; gap: 10px; font-size: 11px; color: #6b7280; margin-top: 4px; }
+        .metric { display: flex; flex-direction: column; }
+        .metric-label { font-size: 9px; color: #9ca3af; text-transform: uppercase; }
+        .metric-value { font-weight: 600; color: #374151; }
+        
+        .target-price { font-size: 11px; color: #6b7280; margin-bottom: 4px; }
+        
+        .prob-bar { height: 18px; background: #f3f4f6; border-radius: 9px; overflow: hidden; display: flex; margin: 4px 0; }
+        .prob-up { background: linear-gradient(90deg, #10b981, #34d399); height: 100%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 9px; font-weight: 600; }
+        .prob-down { background: linear-gradient(90deg, #f87171, #ef4444); height: 100%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 9px; font-weight: 600; }
+        
+        .ev-line { font-size: 11px; margin-top: 3px; }
+        .ev-positive { color: #059669; font-weight: 600; }
+        .ev-negative { color: #dc2626; font-weight: 600; }
+        .progress-text { color: #4f46e5; font-size: 11px; }
+        
+        .loading { text-align: center; padding: 40px; color: #9ca3af; }
+        
+        @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>📊 <span>DNF + HBW</span></h1>
+            <div class="time" id="update-time">加载中...</div>
+        </div>
+        <div class="price" id="btc-price">--</div>
+    </div>
+    
+    <div id="content" class="grid">
+        <div class="loading">加载数据...</div>
+    </div>
+    
+    <script>
+    // ===== 配置 =====
+    const MA_PERIODS = { '1H': 20, '4H': 20 };
+    const THRESHOLDS = { '1H': 0.4, '4H': 1.5 };
+    const EMA_PARAMS = {
+        '1H': { fast: 20, slow: 50, threshold: 0.15 },
+        '4H': { fast: 20, slow: 50, threshold: 0.30 }
+    };
+    const EMA_DYNAMIC = {
+        '1H': { slope_low: 0.10, slope_high: 0.30, mult_normal: 1.0, mult_mid: 1.5, mult_high: 2.0 },
+        '4H': { slope_low: 0.15, slope_high: 0.40, mult_normal: 1.0, mult_mid: 1.5, mult_high: 2.0 }
+    };
+    const BINANCE_API = 'https://api.binance.com';
+    const POLYMARKET_API = 'https://gamma-api.polymarket.com';
+    const MONTHS = ['','january','february','march','april','may','june','july','august','september','october','november','december'];
+    
+    // ===== Binance API =====
+    async function fetchKlines(interval, limit = 100) {
+        const url = `${BINANCE_API}/api/v3/klines?symbol=BTCUSDT&interval=${interval}&limit=${limit}`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+        // 返回格式: [openTime, open, high, low, close, volume, closeTime, ...]
+        // 按时间倒序（最新在前）
+        return data.reverse().map(k => ({
+            time: k[0],
+            open: parseFloat(k[1]),
+            high: parseFloat(k[2]),
+            low: parseFloat(k[3]),
+            close: parseFloat(k[4]),
+            volume: parseFloat(k[5])
+        }));
+    }
+    
+    async function fetchCurrentPrice() {
+        const resp = await fetch(`${BINANCE_API}/api/v3/ticker/price?symbol=BTCUSDT`);
+        const data = await resp.json();
+        return parseFloat(data.price);
+    }
+    
+    async function fetchPriceAt(timestampMs) {
+        const url = `${BINANCE_API}/api/v3/klines?symbol=BTCUSDT&interval=1m&startTime=${timestampMs}&limit=1`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+        if (data && data.length > 0) return parseFloat(data[0][4]);
+        return null;
+    }
+    
+    // ===== 技术指标计算 =====
+    function calcMA(candles, period) {
+        if (candles.length < period + 1) return null;
+        // 排除当前K线（candles[0]是当前），从[1]开始取period根
+        let sum = 0;
+        for (let i = 1; i <= period; i++) {
+            sum += candles[i].close;
+        }
+        return sum / period;
+    }
+    
+    function calcEMA(candles, period) {
+        if (candles.length < period + 1) return null;
+        const k = 2 / (period + 1);
+        // 从旧到新计算EMA，排除当前K线
+        // candles是倒序的，所以从末尾开始
+        let ema = candles[candles.length - 1].close;
+        for (let i = candles.length - 2; i >= 1; i--) {
+            ema = candles[i].close * k + ema * (1 - k);
+        }
+        return ema;
+    }
+    
+    function calcEMASeries(candles, period) {
+        if (candles.length < period) return [];
+        const k = 2 / (period + 1);
+        // candles倒序，从最旧的开始
+        let ema = candles[candles.length - 1].close;
+        const series = [ema];
+        for (let i = candles.length - 2; i >= 0; i--) {
+            ema = candles[i].close * k + ema * (1 - k);
+            series.push(ema);
+        }
+        return series.reverse(); // 转回倒序
+    }
+    
+    function calcDeviation(price, ma) {
+        return ((price - ma) / ma) * 100;
+    }
+    
+    function calcEMASlope(candles, period) {
+        const series = calcEMASeries(candles, period);
+        if (series.length < 3) return 0;
+        // 斜率 = (当前EMA - 3根前EMA) / 3 / EMA * 100
+        const current = series[0];
+        const prev = series[2];
+        return ((current - prev) / 3 / current) * 100;
+    }
+    
+    // ===== 趋势判断 =====
+    function detectTrend(candles, period) {
+        const params = EMA_PARAMS[period];
+        if (!params) return { regime: 'RANGING', filter_passed: true };
+        
+        const emaFast = calcEMA(candles, params.fast);
+        const emaSlow = calcEMA(candles, params.slow);
+        if (!emaFast || !emaSlow) return { regime: 'RANGING', filter_passed: true };
+        
+        const currentPrice = candles[0].close;
+        const distance = Math.abs(emaFast - emaSlow) / emaSlow * 100;
+        
+        let regime;
+        if (distance < params.threshold) {
+            regime = 'RANGING';
+        } else if (emaFast > emaSlow && currentPrice > emaSlow) {
+            regime = 'TRENDING_UP';
+        } else if (emaFast < emaSlow && currentPrice < emaSlow) {
+            regime = 'TRENDING_DOWN';
+        } else {
+            regime = 'RANGING';
+        }
+        
+        return { regime, emaFast, emaSlow, distance, filter_passed: regime === 'RANGING' || true };
+    }
+    
+    // ===== 动态阈值 =====
+    function getDynamicThreshold(period, baseThreshold, candles) {
+        const params = EMA_DYNAMIC[period];
+        if (!params) return { threshold: baseThreshold, multiplier: 1.0, slope: 0, ema: 0 };
+        
+        const slope = Math.abs(calcEMASlope(candles, 20));
+        const ema = calcEMA(candles, 20);
+        
+        let multiplier;
+        if (slope < params.slope_low) {
+            multiplier = params.mult_normal;
+        } else if (slope < params.slope_high) {
+            multiplier = params.mult_mid;
+        } else {
+            multiplier = params.mult_high;
+        }
+        
+        return { threshold: baseThreshold * multiplier, multiplier, slope, ema };
+    }
+    
+    // ===== 概率计算 =====
+    function calcProbability(deviation) {
+        const absDev = Math.abs(deviation);
+        const prob = 0.5 + 0.45 * (1 - Math.exp(-3 * absDev));
+        return Math.min(0.95, prob);
+    }
+    
+    // ===== DNF 信号分析 =====
+    function analyzeDNF(candles, period) {
+        const ma = calcMA(candles, MA_PERIODS[period]);
+        const ema = calcEMA(candles, 20);
+        if (!ma || !ema) return null;
+        
+        const price = candles[0].close;
+        const deviation = calcDeviation(price, ma);
+        const trend = detectTrend(candles, period);
+        const dynThreshold = getDynamicThreshold(period, THRESHOLDS[period], candles);
+        const probability = calcProbability(deviation);
+        
+        // 方向：偏离正 → DOWN，偏离负 → UP
+        let signal = deviation > 0 ? 'DOWN' : 'UP';
+        let trendBlocked = false;
+        let originalSignal = signal;
+        
+        // 趋势过滤
+        if (signal === 'UP' && trend.regime === 'TRENDING_DOWN') {
+            trendBlocked = true;
+        } else if (signal === 'DOWN' && trend.regime === 'TRENDING_UP') {
+            trendBlocked = true;
+        }
+        
+        return {
+            signal: trendBlocked ? null : signal,
+            originalSignal,
+            trendBlocked,
+            deviation,
+            ma,
+            ema,
+            price,
+            probability,
+            trend: trend.regime,
+            emaSlope: calcEMASlope(candles, 20),
+            dynamicThreshold: dynThreshold.threshold,
+            thresholdMultiplier: dynThreshold.multiplier
+        };
+    }
+    
+    // ===== Polymarket =====
+    function getPolymarketSlug(interval, offsetMinutes = 0) {
+        const now = new Date();
+        // ET = UTC-4 (夏令时)
+        const etOffset = -4 * 60;
+        const utcOffset = now.getTimezoneOffset();
+        const etNow = new Date(now.getTime() + (utcOffset + etOffset) * 60000);
+        
+        let tStart = new Date(etNow.getTime() - offsetMinutes * 60000);
+        const totalMin = tStart.getHours() * 60 + tStart.getMinutes();
+        
+        let alignedMin;
+        if (interval === '1h') alignedMin = Math.floor(totalMin / 60) * 60;
+        else if (interval === '4h') alignedMin = Math.floor(totalMin / 240) * 240;
+        else alignedMin = Math.floor(totalMin / parseInt(interval)) * parseInt(interval);
+        
+        tStart = new Date(tStart.getFullYear(), tStart.getMonth(), tStart.getDate(), 
+                         Math.floor(alignedMin / 60), alignedMin % 60, 0);
+        
+        if (interval === '1h') {
+            let hour = tStart.getHours();
+            let hourStr;
+            if (hour === 0) hourStr = '12am';
+            else if (hour < 12) hourStr = hour + 'am';
+            else if (hour === 12) hourStr = '12pm';
+            else hourStr = (hour - 12) + 'pm';
+            return `bitcoin-up-or-down-${MONTHS[tStart.getMonth()+1]}-${tStart.getDate()}-${tStart.getFullYear()}-${hourStr}-et`;
+        } else {
+            // 转为UTC timestamp
+            const utcStart = new Date(tStart.getTime() - (utcOffset + etOffset) * 60000);
+            const slugTs = Math.floor(utcStart.getTime() / 1000);
+            return `btc-updown-${interval}-${slugTs}`;
+        }
+    }
+    
+    async function fetchPolymarketData(interval) {
+        const slug = getPolymarketSlug(interval);
+        try {
+            const resp = await fetch(`${POLYMARKET_API}/events?slug=${slug}`);
+            const data = await resp.json();
+            if (!data || data.length === 0) return null;
+            
+            const event = data[0];
+            const markets = event.markets || [];
+            if (markets.length === 0) return null;
+            
+            const market = markets[0];
+            const eventStart = market.eventStartTime || market.startDate;
+            
+            // 获取UP/DOWN价格
+            let upPrice = 0.5, downPrice = 0.5;
+            const outcomes = market.outcomes || [];
+            const prices = market.outcomePrices ? JSON.parse(market.outcomePrices) : [];
+            
+            for (let i = 0; i < outcomes.length; i++) {
+                if (outcomes[i] === 'Up' || outcomes[i] === 'UP') upPrice = parseFloat(prices[i] || 0.5);
+                else if (outcomes[i] === 'Down' || outcomes[i] === 'DOWN') downPrice = parseFloat(prices[i] || 0.5);
+            }
+            
+            return {
+                eventStart,
+                slug,
+                upPrice,
+                downPrice,
+                volume: market.volume || 0
+            };
+        } catch (e) {
+            console.error('Polymarket fetch error:', e);
+            return null;
+        }
+    }
+    
+    async function getTargetPrice(eventStart) {
+        if (!eventStart) return null;
+        try {
+            const startDt = new Date(eventStart);
+            const startMs = startDt.getTime();
+            return await fetchPriceAt(startMs);
+        } catch { return null; }
+    }
+    
+    // ===== HBW 分析 =====
+    function analyzeHBW(dnfResult, polyData, targetPrice) {
+        if (!polyData || !targetPrice || !dnfResult) return null;
+        
+        const price = dnfResult.price;
+        const targetDev = ((price - targetPrice) / targetPrice) * 100;
+        
+        // 计算进度
+        let progress = null;
+        if (polyData.eventStart) {
+            const start = new Date(polyData.eventStart).getTime();
+            const interval = polyData.slug.includes('4h') ? 4 * 60 : 60;
+            const end = start + interval * 60 * 1000;
+            const now = Date.now();
+            const total = end - start;
+            const elapsed = now - start;
+            const remaining = end - now;
+            if (remaining > 0 && elapsed > 0) {
+                progress = { elapsedRatio: elapsed / total, remainingMin: remaining / 60000 };
+            } else if (remaining <= 0) {
+                progress = { elapsedRatio: 1, remainingMin: 0, ended: true };
+            }
+        }
+        
+        // 简单EV计算
+        const pUp = polyData.upPrice;
+        const pDown = polyData.downPrice;
+        const betAmount = 45; // 固定仓位
+        
+        // 用DNF的概率估算
+        const modelPUp = dnfResult.signal === 'UP' ? dnfResult.probability : (1 - dnfResult.probability);
+        const modelPDown = 1 - modelPUp;
+        
+        // EV for UP bet
+        const evUp = modelPUp * (1 / pUp - 1) - (1 - modelPUp);
+        // EV for DOWN bet  
+        const evDown = modelPDown * (1 / pDown - 1) - (1 - modelPDown);
+        
+        let action = 'NO BET';
+        let ev = 0;
+        let positionUsd = 0;
+        
+        if (evUp > 0.05 && evUp > evDown) {
+            action = 'BUY UP';
+            ev = evUp;
+            positionUsd = betAmount;
+        } else if (evDown > 0.05 && evDown > evUp) {
+            action = 'BUY DOWN';
+            ev = evDown;
+            positionUsd = betAmount;
+        }
+        
+        return {
+            targetPrice,
+            targetDev,
+            pUp,
+            pDown,
+            progress,
+            action,
+            ev,
+            positionUsd,
+            eventStart: polyData.eventStart
+        };
+    }
+    
+    // ===== 渲染 =====
+    function formatRoundTime(eventStart, period) {
+        if (!eventStart) return '';
+        try {
+            const start = new Date(eventStart);
+            const hours = period === '4H' ? 4 : 1;
+            const end = new Date(start.getTime() + hours * 60 * 60 * 1000);
+            const startStr = start.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Shanghai' });
+            const endStr = end.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Shanghai' });
+            return `${startStr}-${endStr}`;
+        } catch { return ''; }
+    }
+    
+    function renderPeriod(period, dnf, hbw) {
+        const titleClass = period === '4H' ? 'p4h' : 'p1h';
+        const badge = period === '4H' ? '<span class="badge badge-main">主阵地</span>' : '<span class="badge badge-ref">参考</span>';
+        
+        const eventStart = hbw?.eventStart;
+        const roundTime = formatRoundTime(eventStart, period);
+        
+        // DNF 信号
+        let dnfSignal = '⚪ 无信号', dnfClass = 'signal-none';
+        if (dnf) {
+            if (dnf.trendBlocked) {
+                dnfSignal = `🚫 过滤 ${dnf.originalSignal || ''}`;
+                dnfClass = 'signal-blocked';
+            } else if (dnf.signal) {
+                const prob = (dnf.probability * 100).toFixed(0);
+                dnfSignal = `${dnf.signal === 'UP' ? '🟢' : '🔴'} ${dnf.signal} ${prob}%`;
+                dnfClass = dnf.signal === 'UP' ? 'signal-up' : 'signal-down';
+            }
+        }
+        
+        let dnfMetrics = '';
+        if (dnf) {
+            const trendIcon = dnf.trend === 'TRENDING_UP' ? '📈' : dnf.trend === 'TRENDING_DOWN' ? '📉' : '↔️';
+            dnfMetrics = `
+                <div class="metrics">
+                    <div class="metric"><span class="metric-label">MA20</span><span class="metric-value">$${dnf.ma.toLocaleString('en-US', {maximumFractionDigits:0})}</span></div>
+                    <div class="metric"><span class="metric-label">偏离</span><span class="metric-value">${dnf.deviation >= 0 ? '+' : ''}${dnf.deviation.toFixed(2)}%</span></div>
+                    <div class="metric"><span class="metric-label">趋势</span><span class="metric-value">${trendIcon}</span></div>
+                </div>
+            `;
+        }
+        
+        // HBW 内容
+        let hbwContent = '';
+        if (hbw) {
+            if (hbw.targetPrice) {
+                hbwContent += `<div class="target-price">🎯 Target: $${hbw.targetPrice.toLocaleString('en-US', {maximumFractionDigits:2})} (${hbw.targetDev >= 0 ? '+' : ''}${hbw.targetDev.toFixed(2)}%)</div>`;
+            }
+            
+            if (hbw.progress && (hbw.progress.elapsedRatio >= 0.5 || hbw.progress.ended)) {
+                const elapsedPct = (hbw.progress.elapsedRatio * 100).toFixed(0);
+                const remainMin = hbw.progress.remainingMin.toFixed(0);
+                hbwContent += `<div class="progress-text">⏱️ 已过 ${elapsedPct}%，剩余 ${remainMin} 分钟</div>`;
+            } else {
+                hbwContent += `
+                    <div class="prob-bar">
+                        <div class="prob-up" style="width:${hbw.pUp*100}%">UP ${(hbw.pUp*100).toFixed(0)}%</div>
+                        <div class="prob-down" style="width:${hbw.pDown*100}%">DOWN ${(hbw.pDown*100).toFixed(0)}%</div>
+                    </div>
+                `;
+            }
+            
+            hbwContent += `<div style="font-size:10px;color:#9ca3af">UP$${hbw.pUp.toFixed(3)} DOWN$${hbw.pDown.toFixed(3)}</div>`;
+            
+            if (hbw.action && hbw.action !== 'NO BET') {
+                const evPct = (hbw.ev * 100).toFixed(1);
+                const sig = hbw.action.includes('UP') ? '🟢UP' : '🔴DOWN';
+                hbwContent += `<div class="ev-line">${sig} <span class="ev-positive">EV +${evPct}%</span> $${hbw.positionUsd}</div>`;
+            } else {
+                hbwContent += `<div class="ev-line" style="color:#9ca3af">🚫 DONT BE GREEDY</div>`;
+            }
+        }
+        
+        return `
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title ${titleClass}">${period} ${badge}</div>
+                    ${roundTime ? `<div class="round-time">${roundTime}</div>` : ''}
+                </div>
+                <div class="strategy">
+                    <div class="strategy-header">
+                        <span class="strategy-name dnf">DNF 均值回归</span>
+                        <span class="signal ${dnfClass}">${dnfSignal}</span>
+                    </div>
+                    ${dnfMetrics}
+                </div>
+                <div class="strategy">
+                    <div class="strategy-header">
+                        <span class="strategy-name hbw">HBW 概率估算</span>
+                    </div>
+                    ${hbwContent}
+                </div>
+            </div>
+        `;
+    }
+    
+    // ===== 主逻辑 =====
+    async function refresh() {
+        try {
+            // 并行获取所有数据
+            const [klines1h, klines4h, price, poly1h, poly4h] = await Promise.all([
+                fetchKlines('1h', 100),
+                fetchKlines('4h', 100),
+                fetchCurrentPrice(),
+                fetchPolymarketData('1h'),
+                fetchPolymarketData('4h')
+            ]);
+            
+            // 更新价格和时间
+            document.getElementById('btc-price').textContent = '$' + price.toLocaleString('en-US', { maximumFractionDigits: 2 });
+            document.getElementById('update-time').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' });
+            
+            // DNF 分析
+            const dnf1h = analyzeDNF(klines1h, '1H');
+            const dnf4h = analyzeDNF(klines4h, '4H');
+            
+            // 获取 target prices
+            const [target1h, target4h] = await Promise.all([
+                getTargetPrice(poly1h?.eventStart),
+                getTargetPrice(poly4h?.eventStart)
+            ]);
+            
+            // HBW 分析
+            const hbw1h = analyzeHBW(dnf1h, poly1h, target1h);
+            const hbw4h = analyzeHBW(dnf4h, poly4h, target4h);
+            
+            // 渲染
+            document.getElementById('content').innerHTML = 
+                renderPeriod('4H', dnf4h, hbw4h) +
+                renderPeriod('1H', dnf1h, hbw1h);
+                
+        } catch (e) {
+            console.error('Refresh error:', e);
+            document.getElementById('content').innerHTML = '<div class="loading">❌ 数据加载失败: ' + e.message + '</div>';
+        }
+    }
+    
+    // 初始加载 + 每30秒刷新
+    refresh();
+    setInterval(refresh, 30000);
+    </script>
+</body>
+</html>
