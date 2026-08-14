@@ -271,13 +271,45 @@
         }
         .momentum-chart-container {
             position: relative;
-            height: 200px;
+            height: 240px;
             width: 100%;
             margin-bottom: 16px;
         }
         .momentum-canvas {
             width: 100%;
             height: 100%;
+            cursor: crosshair;
+        }
+        .momentum-tooltip {
+            display: none;
+            position: absolute;
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 12px;
+            line-height: 1.6;
+            pointer-events: none;
+            z-index: 10;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            white-space: nowrap;
+        }
+        .momentum-tooltip .tt-time {
+            font-weight: 700;
+            font-size: 13px;
+            margin-bottom: 4px;
+            color: #93c5fd;
+        }
+        .momentum-tooltip .tt-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .momentum-tooltip .tt-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
         }
         .momentum-indicators {
             display: grid;
@@ -383,6 +415,7 @@
         </div>
         <div class="momentum-chart-container">
             <canvas id="momentum-chart" class="momentum-canvas"></canvas>
+            <div class="momentum-tooltip" id="momentum-tooltip"></div>
         </div>
         <div class="momentum-indicators">
             <div class="indicator-item">
@@ -1012,7 +1045,10 @@
             });
             
             // 绘制合并图表
-            drawCombinedChart(takerRatios, volumeRatios, bodySizes);
+            drawCombinedChart(takerRatios, volumeRatios, bodySizes, klines4h);
+            
+            // 设置 tooltip 交互
+            setupTooltip();
             
             // 更新指标数值和状态
             const currentTaker = takerRatios[takerRatios.length - 1];
@@ -1079,7 +1115,14 @@
         }
     }
     
-    function drawCombinedChart(takerData, volumeData, bodyData) {
+    // 存储图表数据供 tooltip 使用
+    let _chartPoints = [];
+    let _chartKlines = [];
+    let _chartPadding = {};
+    let _chartMaxVol = 1;
+    let _chartMaxBody = 1;
+    
+    function drawCombinedChart(takerData, volumeData, bodyData, klinesData) {
         const canvas = document.getElementById('momentum-chart');
         if (!canvas) return;
         
@@ -1092,9 +1135,11 @@
         
         const width = rect.width;
         const height = rect.height;
-        const padding = { top: 20, right: 60, bottom: 30, left: 50 };
+        const padding = { top: 20, right: 60, bottom: 40, left: 50 };
         const chartWidth = width - padding.left - padding.right;
         const chartHeight = height - padding.top - padding.bottom;
+        
+        _chartPadding = padding;
         
         // 清空画布
         ctx.clearRect(0, 0, width, height);
@@ -1117,7 +1162,6 @@
         ctx.setLineDash([4, 4]);
         ctx.lineWidth = 1;
         
-        // Taker 65% 线
         const taker65Y = padding.top + (1 - 0.65) * chartHeight;
         ctx.strokeStyle = '#fca5a5';
         ctx.beginPath();
@@ -1125,8 +1169,8 @@
         ctx.lineTo(width - padding.right, taker65Y);
         ctx.stroke();
         
-        // Volume 2.0x 线
         const maxVol = Math.max(...volumeData) * 1.2;
+        _chartMaxVol = maxVol;
         const vol2Y = padding.top + (1 - 2.0 / maxVol) * chartHeight;
         ctx.strokeStyle = '#fcd34d';
         ctx.beginPath();
@@ -1151,7 +1195,6 @@
             });
             ctx.stroke();
             
-            // 最后一个点
             const lastX = padding.left + ((len - 1) / (len - 1)) * chartWidth;
             const lastY = padding.top + (1 - data[len - 1] / maxVal) * chartHeight;
             ctx.fillStyle = color;
@@ -1164,16 +1207,32 @@
             ctx.fill();
         }
         
-        // Taker ratio (0-1)
         drawLine(takerData, '#10b981', 1);
-        // Volume ratio
         drawLine(volumeData, '#f59e0b', maxVol);
-        // Body size (0-3%)
         const maxBody = Math.max(...bodyData) * 1.2;
+        _chartMaxBody = maxBody;
         drawLine(bodyData, '#8b5cf6', maxBody);
         
+        // 时间轴标签（每2根K线 = 8小时标记一次）
+        ctx.font = '10px -apple-system, sans-serif';
+        ctx.fillStyle = '#9ca3af';
+        ctx.textAlign = 'center';
+        
+        const timeStep = 2;
+        for (let i = 0; i < len; i += timeStep) {
+            const x = padding.left + (i / (len - 1)) * chartWidth;
+            if (klinesData && klinesData[i]) {
+                const t = new Date(klinesData[i].time);
+                const month = (t.getMonth() + 1).toString().padStart(2, '0');
+                const day = t.getDate().toString().padStart(2, '0');
+                const hour = t.getHours().toString().padStart(2, '0');
+                ctx.fillText(`${month}/${day} ${hour}:00`, x, height - padding.bottom + 18);
+            }
+        }
+        
         // 图例
-        const legendY = height - 10;
+        const legendY = height - 6;
+        ctx.textAlign = 'left';
         ctx.font = '11px -apple-system, sans-serif';
         
         ctx.fillStyle = '#10b981';
@@ -1193,10 +1252,81 @@
         
         // 右侧标注预警线
         ctx.font = '10px -apple-system, sans-serif';
+        ctx.textAlign = 'left';
         ctx.fillStyle = '#fca5a5';
         ctx.fillText('Taker 65%', width - padding.right + 4, taker65Y + 3);
         ctx.fillStyle = '#fcd34d';
         ctx.fillText('Vol 2.0x', width - padding.right + 4, vol2Y + 3);
+        
+        // 存储数据供 tooltip 使用
+        _chartPoints = [];
+        for (let i = 0; i < len; i++) {
+            _chartPoints.push({
+                x: padding.left + (i / (len - 1)) * chartWidth,
+                taker: takerData[i],
+                volume: volumeData[i],
+                body: bodyData[i],
+                kline: klinesData ? klinesData[i] : null
+            });
+        }
+        _chartKlines = klinesData || [];
+    }
+    
+    // Tooltip 交互
+    function setupTooltip() {
+        const canvas = document.getElementById('momentum-chart');
+        const tooltip = document.getElementById('momentum-tooltip');
+        if (!canvas || !tooltip) return;
+        
+        canvas.addEventListener('mousemove', (e) => {
+            if (_chartPoints.length === 0) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            
+            // 找到最近的点
+            let closest = _chartPoints[0];
+            let minDist = Infinity;
+            _chartPoints.forEach(p => {
+                const dist = Math.abs(p.x - mouseX);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closest = p;
+                }
+            });
+            
+            if (closest.kline) {
+                const t = new Date(closest.kline.time);
+                const month = (t.getMonth() + 1).toString().padStart(2, '0');
+                const day = t.getDate().toString().padStart(2, '0');
+                const hour = t.getHours().toString().padStart(2, '0');
+                const timeStr = `${month}/${day} ${hour}:00`;
+                
+                const takerPct = (closest.taker * 100).toFixed(1);
+                const takerDir = closest.taker > 0.5 ? '买' : '卖';
+                const volRatio = closest.volume.toFixed(2);
+                const bodyPct = closest.body.toFixed(2);
+                const isBullish = closest.kline.close > closest.kline.open;
+                const candleDir = isBullish ? '🟢阳' : '🔴阴';
+                
+                tooltip.innerHTML = `
+                    <div class="tt-time">${timeStr}</div>
+                    <div class="tt-row"><span class="tt-dot" style="background:#10b981"></span>Taker: ${takerDir}方 ${takerPct}%</div>
+                    <div class="tt-row"><span class="tt-dot" style="background:#f59e0b"></span>成交量: ${volRatio}x</div>
+                    <div class="tt-row"><span class="tt-dot" style="background:#8b5cf6"></span>实体: ${bodyPct}% ${candleDir}</div>
+                `;
+                
+                tooltip.style.display = 'block';
+                let left = mouseX + 15;
+                if (left + 180 > rect.width) left = mouseX - 190;
+                tooltip.style.left = left + 'px';
+                tooltip.style.top = '10px';
+            }
+        });
+        
+        canvas.addEventListener('mouseleave', () => {
+            tooltip.style.display = 'none';
+        });
     }
     
     // 初始化动量监控
