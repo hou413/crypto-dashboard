@@ -411,7 +411,7 @@
     <div class="momentum-section">
         <div class="momentum-header">
             <div class="momentum-title">📈 市场动量监控</div>
-            <div class="momentum-subtitle">4H 周期 · 反转预警指标</div>
+            <div class="momentum-subtitle">1H 周期 · 近 4 小时 · 反转预警指标</div>
         </div>
         <div class="momentum-chart-container">
             <canvas id="momentum-chart" class="momentum-canvas"></canvas>
@@ -1018,9 +1018,9 @@
     // ===== 市场动量监控 =====
     async function updateMomentumMonitor() {
         try {
-            // 获取 4H K线数据（最近 20 根）
-            const klines4h = await fetchKlines('4h', 20);
-            if (!klines4h || klines4h.length === 0) return;
+            // 获取 1H K线数据（最近 4 根 = 近 4 小时）
+            const klines1h = await fetchKlines('1h', 4);
+            if (!klines1h || klines1h.length === 0) return;
             
             // 计算三个指标
             const takerRatios = [];
@@ -1028,9 +1028,9 @@
             const bodySizes = [];
             
             // 计算平均成交量（用于突增计算）
-            const avgVolume = klines4h.reduce((sum, k) => sum + k.volume, 0) / klines4h.length;
+            const avgVolume = klines1h.reduce((sum, k) => sum + k.volume, 0) / klines1h.length;
             
-            klines4h.forEach(k => {
+            klines1h.forEach(k => {
                 // 1. Taker 买卖比 (0-1)
                 const takerRatio = k.takerBuyVolume / k.volume;
                 takerRatios.push(takerRatio);
@@ -1044,8 +1044,8 @@
                 bodySizes.push(bodySize);
             });
             
-            // 绘制合并图表
-            drawCombinedChart(takerRatios, volumeRatios, bodySizes, klines4h);
+            // 绘制合并图表（传入 1H K线数据）
+            drawCombinedChart(takerRatios, volumeRatios, bodySizes, klines1h);
             
             // 设置 tooltip 交互
             setupTooltip();
@@ -1213,13 +1213,12 @@
         _chartMaxBody = maxBody;
         drawLine(bodyData, '#8b5cf6', maxBody);
         
-        // 时间轴标签（每2根K线 = 8小时标记一次）
+        // 时间轴标签（显示每根K线的时间）
         ctx.font = '10px -apple-system, sans-serif';
         ctx.fillStyle = '#9ca3af';
         ctx.textAlign = 'center';
         
-        const timeStep = 2;
-        for (let i = 0; i < len; i += timeStep) {
+        for (let i = 0; i < len; i++) {
             const x = padding.left + (i / (len - 1)) * chartWidth;
             if (klinesData && klinesData[i]) {
                 const t = new Date(klinesData[i].time);
