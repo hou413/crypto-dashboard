@@ -395,10 +395,10 @@
     // ===== 反转预警指标（30秒刷新）=====
     async function updateMomentumIndicators() {
         try {
-            const klines5m = await fetchKlines('5m', 6);  // 6根5分钟K线 = 近30分钟
-            if (!klines5m || klines5m.length === 0) return;
-            const avgVolume = klines5m.reduce((sum, k) => sum + k.volume, 0) / klines5m.length;
-            const lastKline = klines5m[klines5m.length - 1];
+            const klines1m = await fetchKlines('1m', 30);  // 30根1分钟K线 = 近30分钟
+            if (!klines1m || klines1m.length === 0) return;
+            const avgVolume = klines1m.reduce((sum, k) => sum + k.volume, 0) / klines1m.length;
+            const lastKline = klines1m[klines1m.length - 1];
             const isBullish = lastKline.close > lastKline.open;
             const direction = isBullish ? '🟢' : '🔴';
             const directionText = isBullish ? '阳线' : '阴线';
