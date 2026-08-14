@@ -92,7 +92,7 @@
     <div class="momentum-section">
         <div class="momentum-header">
             <div class="momentum-title">📈 反转预警指标</div>
-            <div class="momentum-subtitle">1H 周期 · 近 4 小时 · 30秒刷新</div>
+            <div class="momentum-subtitle" id="momentum-update-time">1H 周期 · 近 4 小时 · 加载中...</div>
         </div>
         <div class="momentum-indicators">
             <div class="indicator-item">
@@ -432,6 +432,11 @@
             if (currentBody > 1.5) { bodyStatusEl.textContent = `⚠️ 大${directionText}`; bodyStatusEl.className = 'indicator-status danger'; }
             else if (currentBody > 1.0) { bodyStatusEl.textContent = `⚡ ${directionText}`; bodyStatusEl.className = 'indicator-status warning'; }
             else { bodyStatusEl.textContent = `✅ ${directionText}`; bodyStatusEl.className = 'indicator-status normal'; }
+            // 更新反转预警指标的更新时间
+            const momentumTimeEl = document.getElementById('momentum-update-time');
+            if (momentumTimeEl) {
+                momentumTimeEl.textContent = `1H 周期 · 近 4 小时 · 更新于 ${new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' })}`;
+            }
         } catch (e) { console.error('Momentum indicator error:', e); }
     }
 
