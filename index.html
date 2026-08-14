@@ -590,7 +590,8 @@
     async function fetchTargetPrice(eventStart, period) {
         if (!eventStart) return null;
         
-        const cacheKey = `target_price_${period}_${eventStart}`;
+        // v2 cache key to invalidate old incorrect values
+        const cacheKey = `target_price_v2_${period}_${eventStart}`;
         
         // 先检查缓存
         try {
