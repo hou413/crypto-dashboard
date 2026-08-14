@@ -76,12 +76,31 @@
         }
         .badge-main { background: #eef2ff; color: #4f46e5; }
         .badge-ref { background: #fef3c7; color: #d97706; }
+        .round-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+        }
         .round-time { 
-            font-size: 15px; 
+            font-size: 14px; 
             color: #6b7280; 
             background: #f9fafb; 
-            padding: 6px 12px; 
-            border-radius: 10px; 
+            padding: 4px 10px; 
+            border-radius: 8px; 
+        }
+        .target-price {
+            font-size: 16px;
+            font-weight: 600;
+            color: #059669;
+        }
+        .countdown {
+            font-size: 18px;
+            font-weight: 700;
+            color: #dc2626;
+            background: #fee2e2;
+            padding: 4px 12px;
+            border-radius: 8px;
         }
         
         /* Strategy Section */
@@ -524,6 +543,21 @@
         }
     }
     
+    // 获取轮次开始时的价格（Target Price）
+    async function fetchTargetPrice(eventStart) {
+        if (!eventStart) return null;
+        try {
+            const startMs = new Date(eventStart).getTime();
+            const url = `${BINANCE_API}/api/v3/klines?symbol=BTCUSDT&interval=1m&startTime=${startMs}&limit=1`;
+            const resp = await fetch(url);
+            const data = await resp.json();
+            if (data && data.length > 0) return parseFloat(data[0][4]);
+            return null;
+        } catch {
+            return null;
+        }
+    }
+    
     // ===== 渲染 =====
     function formatRoundTime(eventStart, period) {
         if (!eventStart) return '';
@@ -537,10 +571,35 @@
         } catch { return ''; }
     }
     
-    function renderPeriod(period, dnf, eventStart) {
+    function formatCountdown(eventStart, period) {
+        if (!eventStart) return '';
+        try {
+            const start = new Date(eventStart).getTime();
+            const totalMinutes = period === '4H' ? 240 : 60;
+            const end = start + totalMinutes * 60 * 1000;
+            const remaining = end - Date.now();
+            if (remaining <= 0) return '已结束';
+            const hours = Math.floor(remaining / 3600000);
+            const mins = Math.floor((remaining % 3600000) / 60000);
+            const secs = Math.floor((remaining % 60000) / 1000);
+            if (hours > 0) return `${hours}h ${mins}m`;
+            return `${mins}m ${secs}s`;
+        } catch { return ''; }
+    }
+    
+    function renderPeriod(period, dnf, eventStart, targetPrice) {
         const titleClass = period === '4H' ? 'p4h' : 'p1h';
-        const badge = period === '4H' ? '<span class="badge badge-main">主阵地</span>' : '<span class="badge badge-ref">参考</span>';
-        const roundTime = formatRoundTime(eventStart, period);
+        const countdown = formatCountdown(eventStart, period);
+        
+        // Target price display
+        let targetHtml = '';
+        if (targetPrice) {
+            targetHtml = `<div class="target-price">🎯 $${targetPrice.toLocaleString('en-US', {maximumFractionDigits:2})}</div>`;
+        }
+        let countdownHtml = '';
+        if (countdown) {
+            countdownHtml = `<div class="countdown" id="countdown-${period}">⏱ ${countdown}</div>`;
+        }
         
         // DNF 信号
         let dnfSignal = '⚪ 无信号', dnfClass = 'signal-none';
@@ -625,8 +684,11 @@
         return `
             <div class="period-card">
                 <div class="period-header">
-                    <div class="period-title ${titleClass}">${period} ${badge}</div>
-                    ${roundTime ? `<div class="round-time">${roundTime}</div>` : ''}
+                    <div class="period-title ${titleClass}">${period}</div>
+                    <div class="round-info">
+                        ${targetHtml}
+                        ${countdownHtml}
+                    </div>
                 </div>
                 <div class="strategy">
                     <div class="strategy-header">
@@ -654,6 +716,12 @@
             document.getElementById('btc-price').textContent = '$' + price.toLocaleString('en-US', { maximumFractionDigits: 2 });
             document.getElementById('update-time').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' });
             
+            // 获取 target prices
+            const [target1h, target4h] = await Promise.all([
+                fetchTargetPrice(eventStart1h),
+                fetchTargetPrice(eventStart4h)
+            ]);
+            
             // 计算时间因子
             const tf1h = calcTimeFactor(eventStart1h, '1H');
             const tf4h = calcTimeFactor(eventStart4h, '4H');
@@ -661,9 +729,13 @@
             const dnf1h = analyzeDNF(klines1h, '1H', tf1h);
             const dnf4h = analyzeDNF(klines4h, '4H', tf4h);
             
+            // 存储 eventStart 供倒计时使用
+            window._eventStart4h = eventStart4h;
+            window._eventStart1h = eventStart1h;
+            
             document.getElementById('content').innerHTML = 
-                renderPeriod('4H', dnf4h, eventStart4h) +
-                renderPeriod('1H', dnf1h, eventStart1h);
+                renderPeriod('4H', dnf4h, eventStart4h, target4h) +
+                renderPeriod('1H', dnf1h, eventStart1h, target1h);
                 
         } catch (e) {
             console.error('Refresh error:', e);
@@ -671,8 +743,28 @@
         }
     }
     
+    // 倒计时每秒更新
+    function updateCountdowns() {
+        ['4H', '1H'].forEach(period => {
+            const el = document.getElementById('countdown-' + period);
+            if (!el) return;
+            const eventStart = period === '4H' ? window._eventStart4h : window._eventStart1h;
+            if (!eventStart) return;
+            const totalMinutes = period === '4H' ? 240 : 60;
+            const start = new Date(eventStart).getTime();
+            const end = start + totalMinutes * 60 * 1000;
+            const remaining = end - Date.now();
+            if (remaining <= 0) { el.textContent = '⏱ 已结束'; return; }
+            const hours = Math.floor(remaining / 3600000);
+            const mins = Math.floor((remaining % 3600000) / 60000);
+            const secs = Math.floor((remaining % 60000) / 1000);
+            el.textContent = hours > 0 ? `⏱ ${hours}h ${mins}m` : `⏱ ${mins}m ${secs}s`;
+        });
+    }
+    
     refresh();
     setInterval(refresh, 30000);
+    setInterval(updateCountdowns, 1000);
     </script>
 </body>
 </html>
