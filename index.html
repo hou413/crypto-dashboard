@@ -600,17 +600,18 @@
             // localStorage 不可用
         }
         
-        // 检查轮次是否刚开始（5分钟内）
+        // 检查轮次是否刚开始（10分钟内）
         const startMs = new Date(eventStart).getTime();
         const now = Date.now();
         const elapsed = now - startMs;
         
-        if (elapsed < 5 * 60 * 1000) {
-            // 轮次刚开始，获取 Chainlink 价格并缓存
+        if (elapsed >= 0 && elapsed < 10 * 60 * 1000) {
+            // 轮次刚开始或即将开始，获取 Chainlink 价格并缓存
             const price = await fetchChainlinkPrice();
             if (price) {
                 try {
                     localStorage.setItem(cacheKey, price.toString());
+                    console.log(`[DNF] Cached target price for ${period}: $${price}`);
                 } catch (e) {
                     // 忽略缓存错误
                 }
@@ -618,7 +619,7 @@
             }
         }
         
-        // 轮次已开始一段时间且无缓存，返回 null
+        // 轮次已开始超过 10 分钟且无缓存，返回 null
         return null;
     }
     
