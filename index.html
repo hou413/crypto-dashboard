@@ -392,50 +392,69 @@
         });
     }
 
-    // ===== 反转预警指标（30秒刷新）=====
+    // ===== 反转预警指标（30秒刷新，5分钟滑动窗口）=====
     async function updateMomentumIndicators() {
         try {
+            const WINDOW_SIZE = 5;  // 5分钟滑动窗口
             const klines1m = await fetchKlines('1m', 30);  // 30根1分钟K线 = 近30分钟
-            if (!klines1m || klines1m.length === 0) return;
-            const avgVolume = klines1m.reduce((sum, k) => sum + k.volume, 0) / klines1m.length;
-            const lastKline = klines1m[klines1m.length - 1];
-            const isBullish = lastKline.close > lastKline.open;
+            if (!klines1m || klines1m.length < WINDOW_SIZE) return;
+            
+            // 取最近5根K线作为滑动窗口
+            const window = klines1m.slice(-WINDOW_SIZE);
+            
+            // 30分钟平均成交量（用于成交量倍数计算）
+            const avgVolume30m = klines1m.reduce((sum, k) => sum + k.volume, 0) / klines1m.length;
+            
+            // 窗口内汇总计算
+            let windowBuyVol = 0, windowTotalVol = 0, windowAvgBody = 0;
+            let bullishCount = 0;
+            window.forEach(k => {
+                windowBuyVol += k.takerBuyVolume;
+                windowTotalVol += k.volume;
+                windowAvgBody += Math.abs(k.close - k.open) / k.open * 100;
+                if (k.close > k.open) bullishCount++;
+            });
+            const windowAvgVolume = windowTotalVol / WINDOW_SIZE;
+            windowAvgBody = windowAvgBody / WINDOW_SIZE;
+            
+            // 方向判断：窗口内多数K线方向
+            const isBullish = bullishCount >= 3;
             const direction = isBullish ? '🟢' : '🔴';
-            const directionText = isBullish ? '阳线' : '阴线';
+            const directionText = isBullish ? '偏多' : '偏空';
 
-            // Taker
-            const currentTaker = klines1m[klines1m.length - 1].takerBuyVolume / klines1m[klines1m.length - 1].volume;
+            // Taker 买卖比（5分钟窗口汇总）
+            const takerRatio = windowTotalVol > 0 ? windowBuyVol / windowTotalVol : 0.5;
             const takerValEl = document.getElementById('taker-value');
             const takerStatusEl = document.getElementById('taker-status');
-            const takerDir = currentTaker > 0.5 ? '买方' : '卖方';
-            const takerPct = currentTaker > 0.5 ? (currentTaker * 100).toFixed(1) : ((1 - currentTaker) * 100).toFixed(1);
+            const takerDir = takerRatio > 0.5 ? '买方' : '卖方';
+            const takerPct = takerRatio > 0.5 ? (takerRatio * 100).toFixed(1) : ((1 - takerRatio) * 100).toFixed(1);
             takerValEl.textContent = `${takerDir} ${takerPct}%`;
-            if (currentTaker > 0.65 || currentTaker < 0.35) { takerStatusEl.textContent = '⚠️ 反转风险'; takerStatusEl.className = 'indicator-status danger'; }
-            else if (currentTaker > 0.60 || currentTaker < 0.40) { takerStatusEl.textContent = '⚡ 预警'; takerStatusEl.className = 'indicator-status warning'; }
+            if (takerRatio > 0.65 || takerRatio < 0.35) { takerStatusEl.textContent = '⚠️ 反转风险'; takerStatusEl.className = 'indicator-status danger'; }
+            else if (takerRatio > 0.60 || takerRatio < 0.40) { takerStatusEl.textContent = '⚡ 预警'; takerStatusEl.className = 'indicator-status warning'; }
             else { takerStatusEl.textContent = '✅ 正常'; takerStatusEl.className = 'indicator-status normal'; }
 
-            // Volume
-            const currentVolume = klines1m[klines1m.length - 1].volume / avgVolume;
+            // 成交量倍数（5分钟窗口平均 vs 30分钟平均）
+            const volumeMultiple = avgVolume30m > 0 ? windowAvgVolume / avgVolume30m : 1;
             const volumeValEl = document.getElementById('volume-value');
             const volumeStatusEl = document.getElementById('volume-status');
             const volumeDirection = isBullish ? '放量涨' : '放量跌';
-            volumeValEl.textContent = `${currentVolume.toFixed(2)}x ${direction}`;
-            if (currentVolume > 2.0) { volumeStatusEl.textContent = `⚠️ ${volumeDirection}`; volumeStatusEl.className = 'indicator-status danger'; }
-            else if (currentVolume > 1.5) { volumeStatusEl.textContent = `⚡ ${volumeDirection}`; volumeStatusEl.className = 'indicator-status warning'; }
+            volumeValEl.textContent = `${volumeMultiple.toFixed(2)}x ${direction}`;
+            if (volumeMultiple > 2.0) { volumeStatusEl.textContent = `⚠️ ${volumeDirection}`; volumeStatusEl.className = 'indicator-status danger'; }
+            else if (volumeMultiple > 1.5) { volumeStatusEl.textContent = `⚡ ${volumeDirection}`; volumeStatusEl.className = 'indicator-status warning'; }
             else { volumeStatusEl.textContent = '✅ 正常'; volumeStatusEl.className = 'indicator-status normal'; }
 
-            // Body
-            const currentBody = Math.abs(lastKline.close - lastKline.open) / lastKline.open * 100;
+            // K线实体（5分钟窗口平均）
             const bodyValEl = document.getElementById('body-value');
             const bodyStatusEl = document.getElementById('body-status');
-            bodyValEl.textContent = `${currentBody.toFixed(2)}% ${direction}`;
-            if (currentBody > 1.5) { bodyStatusEl.textContent = `⚠️ 大${directionText}`; bodyStatusEl.className = 'indicator-status danger'; }
-            else if (currentBody > 1.0) { bodyStatusEl.textContent = `⚡ ${directionText}`; bodyStatusEl.className = 'indicator-status warning'; }
+            bodyValEl.textContent = `${windowAvgBody.toFixed(2)}% ${direction}`;
+            if (windowAvgBody > 1.5) { bodyStatusEl.textContent = `⚠️ 大${directionText}`; bodyStatusEl.className = 'indicator-status danger'; }
+            else if (windowAvgBody > 1.0) { bodyStatusEl.textContent = `⚡ ${directionText}`; bodyStatusEl.className = 'indicator-status warning'; }
             else { bodyStatusEl.textContent = `✅ ${directionText}`; bodyStatusEl.className = 'indicator-status normal'; }
+            
             // 更新反转预警指标的更新时间
             const momentumTimeEl = document.getElementById('momentum-update-time');
             if (momentumTimeEl) {
-                momentumTimeEl.textContent = `1H 周期 · 近 4 小时 · 更新于 ${new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' })}`;
+                momentumTimeEl.textContent = `1H 周期 · 5分钟窗口 · 更新于 ${new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' })}`;
             }
         } catch (e) { console.error('Momentum indicator error:', e); }
     }
