@@ -356,8 +356,7 @@
     }
 
     // 计算5分钟窗口Taker（统一数据源）
-    async function calcTaker5min() {
-        const klines1m = await fetchKlines('1m', 10);
+    function calcTaker5min(klines1m) {
         if (!klines1m || klines1m.length < 5) return { buyRatio: 0.5, sellRatio: 0.5 };
         const window = klines1m.slice(-5);
         let buyVol = 0, totalVol = 0;
@@ -369,11 +368,13 @@
     // ===== 主逻辑 =====
     async function refresh() {
         try {
-            const [klines1h, klines4h, price, eventStart1h, eventStart4h, taker5min] = await Promise.all([
-                fetchKlines('1h', 100), fetchKlines('4h', 100), fetchCurrentPrice(),
-                fetchPolymarketEventStart('1h'), fetchPolymarketEventStart('4h'),
-                calcTaker5min()
+            const [klines1h, klines4h, klines1m, price, eventStart1h, eventStart4h] = await Promise.all([
+                fetchKlines('1h', 100), fetchKlines('4h', 100), fetchKlines('1m', 30),
+                fetchCurrentPrice(),
+                fetchPolymarketEventStart('1h'), fetchPolymarketEventStart('4h')
             ]);
+            // 统一Taker数据（1分钟K线5分钟窗口）
+            const taker5min = calcTaker5min(klines1m);
             document.getElementById('btc-price').textContent = '$' + price.toLocaleString('en-US', { maximumFractionDigits: 2 });
             document.getElementById('update-time').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' });
             const [target1h, target4h] = await Promise.all([fetchTargetPrice(eventStart1h), fetchTargetPrice(eventStart4h)]);
@@ -383,6 +384,7 @@
             const dnf4h = analyzeDNF(klines4h, '4H', tf4h, taker5min);
             window._eventStart4h = eventStart4h;
             window._eventStart1h = eventStart1h;
+            window._klines1m = klines1m;  // 保存给反转预警用
             document.getElementById('content').innerHTML = renderPeriod('4H', dnf4h, eventStart4h, target4h) + renderPeriod('1H', dnf1h, eventStart1h, target1h);
         } catch (e) {
             console.error('Refresh error:', e);
@@ -405,11 +407,15 @@
         });
     }
 
-    // ===== 反转预警指标（30秒刷新，5分钟滑动窗口）=====
+    // ===== 反转预警指标（使用refresh()缓存的1分钟K线）=====
     async function updateMomentumIndicators() {
         try {
+            // 优先使用refresh()缓存的数据，保证一致
+            let klines1m = window._klines1m;
+            if (!klines1m) {
+                klines1m = await fetchKlines('1m', 30);
+            }
             const WINDOW_SIZE = 5;  // 5分钟滑动窗口
-            const klines1m = await fetchKlines('1m', 30);  // 30根1分钟K线 = 近30分钟
             if (!klines1m || klines1m.length < WINDOW_SIZE) return;
             
             // 取最近5根K线作为滑动窗口
