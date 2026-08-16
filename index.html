@@ -221,7 +221,7 @@
             return Math.max(0.1, Math.sqrt(remaining / total));
         } catch { return 1.0; }
     }
-    function analyzeDNF(candles, period, timeFactor) {
+    function analyzeDNF(candles, period, timeFactor, takerData) {
         const ma = calcMA(candles, MA_PERIODS[period]);
         const ema = calcEMA(candles, 20);
         if (!ma || !ema) return null;
@@ -230,7 +230,8 @@
         const trend = detectTrend(candles, period);
         const dynThreshold = getDynamicThreshold(period, THRESHOLDS[period], candles);
         const probability = calcProbability(deviation, timeFactor);
-        const takerRatio = calcTakerRatio(candles, 2);
+        // 使用外部传入的1分钟K线5分钟窗口Taker数据
+        const takerRatio = takerData || { buyRatio: 0.5, sellRatio: 0.5 };
         let signal = deviation > 0 ? 'DOWN' : 'UP';
         let trendBlocked = false, originalSignal = signal;
         if (signal === 'UP' && trend.regime === 'TRENDING_DOWN') trendBlocked = true;
@@ -347,27 +348,39 @@
             const sellPct = (tr.sellRatio * 100).toFixed(1);
             let warningHtml = '';
             if (dnf.takerWarning) {
-                warningHtml = `<div class="taker-warning">⚠️ ${dnf.takerWarning.type === 'sell_pressure' ? `卖压预警：近10分钟卖方占比 ${sellPct}%，回归可能延迟` : `买压预警：近10分钟买方占比 ${buyPct}%，回归可能延迟`}</div>`;
+                warningHtml = `<div class="taker-warning">⚠️ ${dnf.takerWarning.type === 'sell_pressure' ? `卖压预警：近5分钟卖方占比 ${sellPct}%，回归可能延迟` : `买压预警：近5分钟买方占比 ${buyPct}%，回归可能延迟`}</div>`;
             }
-            takerSection = `<div class="taker-section"><div class="taker-title">📊 Taker 买卖量 (近10分钟)</div><div class="taker-bar-container"><div class="taker-bar"><div class="taker-buy" style="width:${buyPct}%">买 ${buyPct}%</div><div class="taker-sell" style="width:${sellPct}%">卖 ${sellPct}%</div></div></div>${warningHtml}</div>`;
+            takerSection = `<div class="taker-section"><div class="taker-title">📊 Taker 买卖量 (近5分钟)</div><div class="taker-bar-container"><div class="taker-bar"><div class="taker-buy" style="width:${buyPct}%">买 ${buyPct}%</div><div class="taker-sell" style="width:${sellPct}%">卖 ${sellPct}%</div></div></div>${warningHtml}</div>`;
         }
         return `<div class="period-card"><div class="period-header"><div class="period-title ${titleClass}">${period}</div><div class="round-info">${targetHtml}${countdownHtml}</div></div><div class="strategy"><div class="strategy-header"><span class="strategy-name">📊 DNF 均值回归</span><span class="signal ${dnfClass}">${dnfSignal}</span></div>${dnfMetrics}${takerSection}</div></div>`;
+    }
+
+    // 计算5分钟窗口Taker（统一数据源）
+    async function calcTaker5min() {
+        const klines1m = await fetchKlines('1m', 10);
+        if (!klines1m || klines1m.length < 5) return { buyRatio: 0.5, sellRatio: 0.5 };
+        const window = klines1m.slice(-5);
+        let buyVol = 0, totalVol = 0;
+        window.forEach(k => { buyVol += k.takerBuyVolume; totalVol += k.volume; });
+        const buyRatio = totalVol > 0 ? buyVol / totalVol : 0.5;
+        return { buyRatio, sellRatio: 1 - buyRatio };
     }
 
     // ===== 主逻辑 =====
     async function refresh() {
         try {
-            const [klines1h, klines4h, price, eventStart1h, eventStart4h] = await Promise.all([
+            const [klines1h, klines4h, price, eventStart1h, eventStart4h, taker5min] = await Promise.all([
                 fetchKlines('1h', 100), fetchKlines('4h', 100), fetchCurrentPrice(),
-                fetchPolymarketEventStart('1h'), fetchPolymarketEventStart('4h')
+                fetchPolymarketEventStart('1h'), fetchPolymarketEventStart('4h'),
+                calcTaker5min()
             ]);
             document.getElementById('btc-price').textContent = '$' + price.toLocaleString('en-US', { maximumFractionDigits: 2 });
             document.getElementById('update-time').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' });
             const [target1h, target4h] = await Promise.all([fetchTargetPrice(eventStart1h), fetchTargetPrice(eventStart4h)]);
             const tf1h = calcTimeFactor(eventStart1h, '1H');
             const tf4h = calcTimeFactor(eventStart4h, '4H');
-            const dnf1h = analyzeDNF(klines1h, '1H', tf1h);
-            const dnf4h = analyzeDNF(klines4h, '4H', tf4h);
+            const dnf1h = analyzeDNF(klines1h, '1H', tf1h, taker5min);
+            const dnf4h = analyzeDNF(klines4h, '4H', tf4h, taker5min);
             window._eventStart4h = eventStart4h;
             window._eventStart1h = eventStart1h;
             document.getElementById('content').innerHTML = renderPeriod('4H', dnf4h, eventStart4h, target4h) + renderPeriod('1H', dnf1h, eventStart1h, target1h);
