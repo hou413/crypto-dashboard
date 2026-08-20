@@ -141,7 +141,7 @@
     </div>
 
     <script>
-    const MA_PERIODS = { '15M': 20, '1H': 20, '4H': 20 };
+    const MA_PERIODS = { '15M': 5, '1H': 20, '4H': 20 };
     const THRESHOLDS = { '15M': 0.3, '1H': 0.4, '4H': 1.5 };
     const EMA_PARAMS = { '15M': { fast: 20, slow: 50, threshold: 0.12 }, '1H': { fast: 20, slow: 50, threshold: 0.15 }, '4H': { fast: 20, slow: 50, threshold: 0.30 } };
     const EMA_DYNAMIC = { '15M': { slope_low: 0.08, slope_high: 0.25, mult_normal: 1.0, mult_mid: 1.5, mult_high: 2.0 }, '1H': { slope_low: 0.10, slope_high: 0.30, mult_normal: 1.0, mult_mid: 1.5, mult_high: 2.0 }, '4H': { slope_low: 0.15, slope_high: 0.40, mult_normal: 1.0, mult_mid: 1.5, mult_high: 2.0 } };
