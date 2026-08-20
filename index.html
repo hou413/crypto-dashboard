@@ -423,17 +423,7 @@
                     <div class="metric-box"><div class="metric-label">⏱️ 时间因子</div><div class="metric-value" style="color:${dnf.timeFactor > 0.7 ? '#059669' : dnf.timeFactor > 0.4 ? '#d97706' : '#dc2626'}">${(dnf.timeFactor * 100).toFixed(0)}%</div></div>
                 </div>`;
         }
-        let takerSection = '';
-        if (dnf && dnf.takerRatio) {
-            const tr = dnf.takerRatio;
-            const buyPct = (tr.buyRatio * 100).toFixed(1);
-            const sellPct = (tr.sellRatio * 100).toFixed(1);
-            let warningHtml = '';
-            if (dnf.takerWarning) {
-                warningHtml = `<div class="taker-warning">⚠️ ${dnf.takerWarning.type === 'sell_pressure' ? `卖压预警：近5分钟卖方占比 ${sellPct}%，回归可能延迟` : `买压预警：近5分钟买方占比 ${buyPct}%，回归可能延迟`}</div>`;
-            }
-            takerSection = `<div class="taker-section"><div class="taker-title">📊 Taker 买卖量 (近5分钟)</div><div class="taker-bar-container"><div class="taker-bar"><div class="taker-buy" style="width:${buyPct}%">买 ${buyPct}%</div><div class="taker-sell" style="width:${sellPct}%">卖 ${sellPct}%</div></div></div>${warningHtml}</div>`;
-        }
+        const takerSection = '';
 
         // 支撑阻力 + 确认
         let srSection = '';
