@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DNF Dashboard</title>
+    <title>DNF V8 Dashboard</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -23,13 +23,14 @@
         .header-right { text-align: right; }
         .price { font-size: 32px; font-weight: 700; color: #2563eb; }
         .time { font-size: 14px; color: #6b7280; margin-top: 4px; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+        .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+        @media (max-width: 1200px) { .grid { grid-template-columns: 1fr; } }
         .period-card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .period-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f3f4f6; }
         .period-title { font-size: 24px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
         .period-title.p4h { color: #4f46e5; }
         .period-title.p1h { color: #d97706; }
+        .period-title.p15m { color: #059669; }
         .round-info { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
         .target-price { font-size: 16px; font-weight: 600; color: #059669; }
         .countdown { font-size: 18px; font-weight: 700; color: #dc2626; background: #fee2e2; padding: 4px 12px; border-radius: 8px; }
@@ -48,7 +49,8 @@
         .metric-value.positive { color: #059669; }
         .metric-value.negative { color: #dc2626; }
         .loading { text-align: center; padding: 60px; color: #6b7280; font-size: 18px; }
-        .slogan { text-align: center; font-size: 22px; font-weight: 700; color: #4f46e5; margin-bottom: 24px; padding: 12px 20px; background: linear-gradient(135deg, #eef2ff, #faf5ff); border-radius: 12px; border: 2px solid #c7d2fe; letter-spacing: 0.5px; }
+        .slogan { text-align: center; font-size: 22px; font-weight: 700; color: #4f46e5; margin-bottom: 12px; padding: 12px 20px; background: linear-gradient(135deg, #eef2ff, #faf5ff); border-radius: 12px; border: 2px solid #c7d2fe; letter-spacing: 0.5px; }
+        .slogan-sub { text-align: center; font-size: 15px; font-weight: 600; color: #0369a1; margin-bottom: 24px; padding: 10px 20px; background: #f0f9ff; border-radius: 12px; border: 2px solid #bae6fd; }
         .taker-section { margin-top: 12px; padding: 12px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; }
         .taker-title { font-size: 13px; font-weight: 600; color: #6b7280; margin-bottom: 8px; }
         .taker-bar-container { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
@@ -56,6 +58,21 @@
         .taker-buy { background: linear-gradient(90deg, #10b981, #34d399); height: 100%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 600; }
         .taker-sell { background: linear-gradient(90deg, #f87171, #ef4444); height: 100%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 600; }
         .taker-warning { margin-top: 8px; padding: 8px 12px; background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; font-size: 13px; font-weight: 600; color: #92400e; text-align: center; }
+
+        /* 支撑阻力 + 斐波那契 */
+        .sr-section { margin-top: 12px; padding: 12px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; }
+        .sr-title { font-size: 13px; font-weight: 600; color: #6b7280; margin-bottom: 8px; }
+        .sr-line { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 13px; }
+        .sr-line.support { color: #059669; }
+        .sr-line.resistance { color: #dc2626; }
+        .sr-confirm { margin-top: 8px; padding: 8px 12px; background: #d1fae5; border: 1px solid #6ee7b7; border-radius: 8px; font-size: 13px; font-weight: 600; color: #065f46; text-align: center; }
+        .sr-no-confirm { margin-top: 8px; padding: 8px 12px; background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; font-size: 13px; font-weight: 600; color: #92400e; text-align: center; }
+        .fib-section { margin-top: 8px; padding: 10px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; }
+        .fib-title { font-size: 12px; font-weight: 600; color: #6b7280; margin-bottom: 6px; }
+        .fib-levels { display: flex; flex-wrap: wrap; gap: 6px; }
+        .fib-level { font-size: 11px; padding: 4px 8px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 6px; }
+        .fib-level.support { border-color: #6ee7b7; color: #059669; }
+        .fib-level.resistance { border-color: #fca5a5; color: #dc2626; }
 
         /* Momentum Section */
         .momentum-section { margin-top: 24px; padding: 20px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
@@ -80,13 +97,14 @@
 </head>
 <body>
     <div class="header">
-        <div><h1>📊 <span>DNF</span></h1></div>
+        <div><h1>📊 <span>DNF V8</span></h1></div>
         <div class="header-right">
             <div class="price" id="btc-price">--</div>
             <div class="time" id="update-time">加载中...</div>
         </div>
     </div>
     <div class="slogan">💡 Don't be silly! Don't be greedy!</div>
+    <div class="slogan-sub">📐 趋势决定能不能做 | 概率决定值不值得做 | 支撑阻力决定信不信</div>
     <div id="content" class="grid"><div class="loading">加载数据...</div></div>
 
     <div class="momentum-section">
@@ -123,10 +141,11 @@
     </div>
 
     <script>
-    const MA_PERIODS = { '1H': 20, '4H': 20 };
-    const THRESHOLDS = { '1H': 0.4, '4H': 1.5 };
-    const EMA_PARAMS = { '1H': { fast: 20, slow: 50, threshold: 0.15 }, '4H': { fast: 20, slow: 50, threshold: 0.30 } };
-    const EMA_DYNAMIC = { '1H': { slope_low: 0.10, slope_high: 0.30, mult_normal: 1.0, mult_mid: 1.5, mult_high: 2.0 }, '4H': { slope_low: 0.15, slope_high: 0.40, mult_normal: 1.0, mult_mid: 1.5, mult_high: 2.0 } };
+    const MA_PERIODS = { '15M': 20, '1H': 20, '4H': 20 };
+    const THRESHOLDS = { '15M': 0.3, '1H': 0.4, '4H': 1.5 };
+    const EMA_PARAMS = { '15M': { fast: 20, slow: 50, threshold: 0.12 }, '1H': { fast: 20, slow: 50, threshold: 0.15 }, '4H': { fast: 20, slow: 50, threshold: 0.30 } };
+    const EMA_DYNAMIC = { '15M': { slope_low: 0.08, slope_high: 0.25, mult_normal: 1.0, mult_mid: 1.5, mult_high: 2.0 }, '1H': { slope_low: 0.10, slope_high: 0.30, mult_normal: 1.0, mult_mid: 1.5, mult_high: 2.0 }, '4H': { slope_low: 0.15, slope_high: 0.40, mult_normal: 1.0, mult_mid: 1.5, mult_high: 2.0 } };
+    const LOOKBACK = { '15M': 8, '1H': 8, '4H': 6 };
     const BINANCE_API = 'https://api.binance.com';
     const POLYMARKET_API = 'https://gamma-api.polymarket.com';
     const MONTHS = ['','january','february','march','april','may','june','july','august','september','october','november','december'];
@@ -212,7 +231,7 @@
         if (!eventStart) return 1.0;
         try {
             const start = new Date(eventStart).getTime();
-            const totalMinutes = period === '4H' ? 240 : 60;
+            const totalMinutes = period === '4H' ? 240 : period === '1H' ? 60 : 15;
             const end = start + totalMinutes * 60 * 1000;
             const remaining = end - Date.now();
             const total = end - start;
@@ -221,6 +240,67 @@
             return Math.max(0.1, Math.sqrt(remaining / total));
         } catch { return 1.0; }
     }
+
+    // 支撑阻力（局部极值法）
+    function findSupportResistance(candles, lookback) {
+        if (!candles || candles.length < 5) return { support: null, resistance: null };
+        const data = candles.slice(1, lookback + 1);
+        if (data.length < 5) return { support: null, resistance: null };
+        const currentPrice = candles[0].close;
+        const dataReversed = [...data].reverse();
+        const supportCandidates = [];
+        const resistanceCandidates = [];
+        for (let i = 1; i < dataReversed.length - 1; i++) {
+            const lowPrev = dataReversed[i-1].low;
+            const lowCurr = dataReversed[i].low;
+            const lowNext = dataReversed[i+1].low;
+            const highPrev = dataReversed[i-1].high;
+            const highCurr = dataReversed[i].high;
+            const highNext = dataReversed[i+1].high;
+            if (lowCurr < lowPrev && lowCurr < lowNext && lowCurr < currentPrice) {
+                supportCandidates.push(lowCurr);
+            }
+            if (highCurr > highPrev && highCurr > highNext && highCurr > currentPrice) {
+                resistanceCandidates.push(highCurr);
+            }
+        }
+        const support = supportCandidates.length > 0 ? Math.max(...supportCandidates) : null;
+        const resistance = resistanceCandidates.length > 0 ? Math.min(...resistanceCandidates) : null;
+        return { support, resistance };
+    }
+
+    // 斐波那契回撤 + 扩展
+    function calcFibonacci(candles, lookback, trendRegime) {
+        if (!candles || candles.length < 10) return { retracement: {}, extension: {}, direction: null };
+        const data = candles.slice(1, lookback + 1);
+        if (data.length < 10) return { retracement: {}, extension: {}, direction: null };
+        const highs = data.map(c => c.high);
+        const lows = data.map(c => c.low);
+        const swingHigh = Math.max(...highs);
+        const swingLow = Math.min(...lows);
+        let direction;
+        if (trendRegime === 'TRENDING_UP') direction = 'up';
+        else if (trendRegime === 'TRENDING_DOWN') direction = 'down';
+        else {
+            const recentCloses = data.slice(0, 10).map(c => c.close);
+            direction = recentCloses[0] > recentCloses[recentCloses.length - 1] ? 'up' : 'down';
+        }
+        const priceRange = swingHigh - swingLow;
+        if (priceRange <= 0) return { retracement: {}, extension: {}, direction };
+        const retracement = {};
+        const extension = {};
+        const retraceRatios = [23.6, 38.2, 50.0, 61.8, 78.6];
+        const extendRatios = [127.2, 161.8, 200.0];
+        if (direction === 'up') {
+            retraceRatios.forEach(r => retracement[r] = swingHigh - priceRange * (r / 100));
+            extendRatios.forEach(r => extension[r] = swingLow + priceRange * (r / 100));
+        } else {
+            retraceRatios.forEach(r => retracement[r] = swingLow + priceRange * (r / 100));
+            extendRatios.forEach(r => extension[r] = swingHigh - priceRange * (r / 100));
+        }
+        return { retracement, extension, direction };
+    }
+
     function analyzeDNF(candles, period, timeFactor, takerData) {
         const ma = calcMA(candles, MA_PERIODS[period]);
         const ema = calcEMA(candles, 20);
@@ -230,7 +310,6 @@
         const trend = detectTrend(candles, period);
         const dynThreshold = getDynamicThreshold(period, THRESHOLDS[period], candles);
         const probability = calcProbability(deviation, timeFactor);
-        // 使用外部传入的1分钟K线5分钟窗口Taker数据
         const takerRatio = takerData || { buyRatio: 0.5, sellRatio: 0.5 };
         let signal = deviation > 0 ? 'DOWN' : 'UP';
         let trendBlocked = false, originalSignal = signal;
@@ -239,7 +318,10 @@
         let takerWarning = null;
         if (signal === 'UP' && takerRatio.sellRatio > 0.60) takerWarning = { type: 'sell_pressure', ratio: takerRatio.sellRatio };
         else if (signal === 'DOWN' && takerRatio.buyRatio > 0.60) takerWarning = { type: 'buy_pressure', ratio: takerRatio.buyRatio };
-        return { signal: trendBlocked ? null : signal, originalSignal, trendBlocked, deviation, ma, ema, price, probability, timeFactor, trend: trend.regime, emaSlope: calcEMASlope(candles, 20), dynamicThreshold: dynThreshold.threshold, thresholdMultiplier: dynThreshold.multiplier, takerRatio, takerWarning };
+        const lookback = LOOKBACK[period] || 8;
+        const sr = findSupportResistance(candles, lookback);
+        const fib = calcFibonacci(candles, 50, trend.regime);
+        return { signal: trendBlocked ? null : signal, originalSignal, trendBlocked, deviation, ma, ema, price, probability, timeFactor, trend: trend.regime, emaSlope: calcEMASlope(candles, 20), dynamicThreshold: dynThreshold.threshold, thresholdMultiplier: dynThreshold.multiplier, takerRatio, takerWarning, support: sr.support, resistance: sr.resistance, fib };
     }
     function getPolymarketSlug(interval) {
         const now = new Date();
@@ -301,7 +383,7 @@
         if (!eventStart) return '';
         try {
             const start = new Date(eventStart).getTime();
-            const totalMinutes = period === '4H' ? 240 : 60;
+            const totalMinutes = period === '4H' ? 240 : period === '1H' ? 60 : 15;
             const remaining = start + totalMinutes * 60 * 1000 - Date.now();
             if (remaining <= 0) return '已结束';
             const hours = Math.floor(remaining / 3600000);
@@ -311,7 +393,7 @@
         } catch { return ''; }
     }
     function renderPeriod(period, dnf, eventStart, targetPrice) {
-        const titleClass = period === '4H' ? 'p4h' : 'p1h';
+        const titleClass = period === '4H' ? 'p4h' : period === '1H' ? 'p1h' : 'p15m';
         const countdown = formatCountdown(eventStart, period);
         let targetHtml = targetPrice ? `<div class="target-price">🎯 $${targetPrice.toLocaleString('en-US', {maximumFractionDigits:2})}</div>` : '';
         let countdownHtml = countdown ? `<div class="countdown" id="countdown-${period}">⏱ ${countdown}</div>` : '';
@@ -352,7 +434,83 @@
             }
             takerSection = `<div class="taker-section"><div class="taker-title">📊 Taker 买卖量 (近5分钟)</div><div class="taker-bar-container"><div class="taker-bar"><div class="taker-buy" style="width:${buyPct}%">买 ${buyPct}%</div><div class="taker-sell" style="width:${sellPct}%">卖 ${sellPct}%</div></div></div>${warningHtml}</div>`;
         }
-        return `<div class="period-card"><div class="period-header"><div class="period-title ${titleClass}">${period}</div><div class="round-info">${targetHtml}${countdownHtml}</div></div><div class="strategy"><div class="strategy-header"><span class="strategy-name">📊 DNF 均值回归</span><span class="signal ${dnfClass}">${dnfSignal}</span></div>${dnfMetrics}${takerSection}</div></div>`;
+
+        // 支撑阻力 + 确认
+        let srSection = '';
+        if (dnf) {
+            const price = dnf.price;
+            const support = dnf.support;
+            const resistance = dnf.resistance;
+            const signalDir = dnf.signal || dnf.originalSignal;
+            let srLines = '';
+            if (support) {
+                const dist = ((price - support) / price * 100).toFixed(2);
+                srLines += `<div class="sr-line support"><span>支撑 $${support.toLocaleString('en-US', {maximumFractionDigits:0})}</span><span>${dist >= 0 ? '+' : ''}${dist}%</span></div>`;
+            }
+            if (resistance) {
+                const dist = ((resistance - price) / price * 100).toFixed(2);
+                srLines += `<div class="sr-line resistance"><span>阻力 $${resistance.toLocaleString('en-US', {maximumFractionDigits:0})}</span><span>+${dist}%</span></div>`;
+            }
+            let confirmHtml = '';
+            if (signalDir && price) {
+                const supportDist = support ? Math.abs(price - support) / price * 100 : 999;
+                const resistanceDist = resistance ? Math.abs(resistance - price) / price * 100 : 999;
+                if (signalDir === 'UP' && supportDist < 0.5) {
+                    confirmHtml = '<div class="sr-confirm">✅ 支撑确认（靠近支撑线，买盘承接）</div>';
+                } else if (signalDir === 'DOWN' && resistanceDist < 0.5) {
+                    confirmHtml = '<div class="sr-confirm">✅ 阻力确认（靠近阻力线，卖盘压力）</div>';
+                } else if (signalDir === 'UP' || signalDir === 'DOWN') {
+                    confirmHtml = '<div class="sr-no-confirm">⚠️ 无支撑阻力确认</div>';
+                }
+            }
+
+            // 斐波那契
+            let fibHtml = '';
+            if (dnf.fib && dnf.fib.direction) {
+                const fib = dnf.fib;
+                const extLevels = [];
+                const retLevels = [];
+                if (fib.direction === 'up') {
+                    [127.2, 161.8, 200.0].forEach(r => {
+                        if (fib.extension[r]) {
+                            const dist = ((fib.extension[r] - price) / price * 100).toFixed(1);
+                            extLevels.push(`<span class="fib-level resistance">${r}%=$${fib.extension[r].toLocaleString('en-US', {maximumFractionDigits:0})}(+${dist}%)</span>`);
+                        }
+                    });
+                    [38.2, 50.0, 61.8].forEach(r => {
+                        if (fib.retracement[r]) {
+                            const dist = ((fib.retracement[r] - price) / price * 100).toFixed(1);
+                            retLevels.push(`<span class="fib-level support">${r}%=$${fib.retracement[r].toLocaleString('en-US', {maximumFractionDigits:0})}(${dist}%)</span>`);
+                        }
+                    });
+                } else {
+                    [127.2, 161.8, 200.0].forEach(r => {
+                        if (fib.extension[r]) {
+                            const dist = ((price - fib.extension[r]) / price * 100).toFixed(1);
+                            extLevels.push(`<span class="fib-level support">${r}%=$${fib.extension[r].toLocaleString('en-US', {maximumFractionDigits:0})}(-${dist}%)</span>`);
+                        }
+                    });
+                    [38.2, 50.0, 61.8].forEach(r => {
+                        if (fib.retracement[r]) {
+                            const dist = ((fib.retracement[r] - price) / price * 100).toFixed(1);
+                            retLevels.push(`<span class="fib-level resistance">${r}%=$${fib.retracement[r].toLocaleString('en-US', {maximumFractionDigits:0})}(+${dist}%)</span>`);
+                        }
+                    });
+                }
+                if (extLevels.length > 0 || retLevels.length > 0) {
+                    fibHtml = `<div class="fib-section"><div class="fib-title">🎯 斐波那契</div>`;
+                    if (extLevels.length > 0) fibHtml += `<div class="fib-levels">${extLevels.join('')}</div>`;
+                    if (retLevels.length > 0) fibHtml += `<div class="fib-levels" style="margin-top:4px">${retLevels.join('')}</div>`;
+                    fibHtml += `</div>`;
+                }
+            }
+
+            if (srLines || fibHtml) {
+                srSection = `<div class="sr-section"><div class="sr-title">📍 支撑阻力</div>${srLines}${confirmHtml}${fibHtml}</div>`;
+            }
+        }
+
+        return `<div class="period-card"><div class="period-header"><div class="period-title ${titleClass}">${period}</div><div class="round-info">${targetHtml}${countdownHtml}</div></div><div class="strategy"><div class="strategy-header"><span class="strategy-name">📊 DNF 均值回归</span><span class="signal ${dnfClass}">${dnfSignal}</span></div>${dnfMetrics}${takerSection}${srSection}</div></div>`;
     }
 
     // 计算5分钟窗口Taker（统一数据源）
@@ -368,36 +526,39 @@
     // ===== 主逻辑 =====
     async function refresh() {
         try {
-            const [klines1h, klines4h, klines1m, price, eventStart1h, eventStart4h] = await Promise.all([
-                fetchKlines('1h', 100), fetchKlines('4h', 100), fetchKlines('1m', 30),
+            const [klines1h, klines4h, klines15m, klines1m, price, eventStart1h, eventStart4h, eventStart15m] = await Promise.all([
+                fetchKlines('1h', 100), fetchKlines('4h', 100), fetchKlines('15m', 100), fetchKlines('1m', 30),
                 fetchCurrentPrice(),
-                fetchPolymarketEventStart('1h'), fetchPolymarketEventStart('4h')
+                fetchPolymarketEventStart('1h'), fetchPolymarketEventStart('4h'), fetchPolymarketEventStart('15m')
             ]);
             // 统一Taker数据（1分钟K线5分钟窗口）
             const taker5min = calcTaker5min(klines1m);
             document.getElementById('btc-price').textContent = '$' + price.toLocaleString('en-US', { maximumFractionDigits: 2 });
             document.getElementById('update-time').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' });
-            const [target1h, target4h] = await Promise.all([fetchTargetPrice(eventStart1h), fetchTargetPrice(eventStart4h)]);
+            const [target1h, target4h, target15m] = await Promise.all([fetchTargetPrice(eventStart1h), fetchTargetPrice(eventStart4h), fetchTargetPrice(eventStart15m)]);
             const tf1h = calcTimeFactor(eventStart1h, '1H');
             const tf4h = calcTimeFactor(eventStart4h, '4H');
+            const tf15m = calcTimeFactor(eventStart15m, '15M');
             const dnf1h = analyzeDNF(klines1h, '1H', tf1h, taker5min);
             const dnf4h = analyzeDNF(klines4h, '4H', tf4h, taker5min);
+            const dnf15m = analyzeDNF(klines15m, '15M', tf15m, taker5min);
             window._eventStart4h = eventStart4h;
             window._eventStart1h = eventStart1h;
+            window._eventStart15m = eventStart15m;
             window._klines1m = klines1m;  // 保存给反转预警用
-            document.getElementById('content').innerHTML = renderPeriod('4H', dnf4h, eventStart4h, target4h) + renderPeriod('1H', dnf1h, eventStart1h, target1h);
+            document.getElementById('content').innerHTML = renderPeriod('4H', dnf4h, eventStart4h, target4h) + renderPeriod('1H', dnf1h, eventStart1h, target1h) + renderPeriod('15M', dnf15m, eventStart15m, target15m);
         } catch (e) {
             console.error('Refresh error:', e);
             document.getElementById('content').innerHTML = '<div class="loading">❌ 数据加载失败: ' + e.message + '</div>';
         }
     }
     function updateCountdowns() {
-        ['4H', '1H'].forEach(period => {
+        ['4H', '1H', '15M'].forEach(period => {
             const el = document.getElementById('countdown-' + period);
             if (!el) return;
-            const eventStart = period === '4H' ? window._eventStart4h : window._eventStart1h;
+            const eventStart = period === '4H' ? window._eventStart4h : period === '1H' ? window._eventStart1h : window._eventStart15m;
             if (!eventStart) return;
-            const totalMinutes = period === '4H' ? 240 : 60;
+            const totalMinutes = period === '4H' ? 240 : period === '1H' ? 60 : 15;
             const remaining = new Date(eventStart).getTime() + totalMinutes * 60 * 1000 - Date.now();
             if (remaining <= 0) { el.textContent = '⏱ 已结束'; return; }
             const hours = Math.floor(remaining / 3600000);
