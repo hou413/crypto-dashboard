@@ -505,8 +505,23 @@
                 }
             }
 
-            if (srLines || fibHtml) {
-                srSection = `<div class="sr-section"><div class="sr-title">📍 支撑阻力</div>${srLines}${confirmHtml}${fibHtml}</div>`;
+            // 风险收益比
+            let rrHtml = '';
+            if (signalDir && price && support && resistance) {
+                const supportDistPct = (price - support) / price * 100;
+                const resistanceDistPct = (resistance - price) / price * 100;
+                let reward, risk;
+                if (signalDir === 'UP') { reward = resistanceDistPct; risk = supportDistPct; }
+                else { reward = supportDistPct; risk = resistanceDistPct; }
+                if (risk > 0.01) {
+                    const rrRatio = reward / risk;
+                    const rrEmoji = rrRatio >= 2.0 ? '✅' : rrRatio >= 1.0 ? '⚠️' : '❌';
+                    rrHtml = `<div class="sr-line" style="color:#6b7280; font-size:12px; margin-top:6px">${rrEmoji} 风险收益比: ${rrRatio.toFixed(1)}:1 (收益${reward >= 0 ? '+' : ''}${reward.toFixed(2)}% / 风险${risk.toFixed(2)}%)</div>`;
+                }
+            }
+
+            if (srLines || fibHtml || rrHtml) {
+                srSection = `<div class="sr-section"><div class="sr-title">📍 支撑阻力</div>${srLines}${confirmHtml}${rrHtml}${fibHtml}</div>`;
             }
         }
 
